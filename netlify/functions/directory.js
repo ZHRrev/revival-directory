@@ -35,8 +35,19 @@ function looksLikeDirectory(d) {
 export default async (req) => {
   const store = getStore('revival-directory');
   const adminKey = process.env.ADMIN_KEY || '';
+  /* Optional. Leave READER_KEY unset and the directory stays open to anyone
+     with the link, exactly as before. Set it and nothing is served without it. */
+  const readerKey = process.env.READER_KEY || '';
+
+  /* An admin password also opens the door, so editors need only one password. */
+  const mayRead = () => {
+    if (!readerKey) return true;
+    const given = req.headers.get('x-reader-key') || '';
+    return sameSecret(given, readerKey) || (adminKey && sameSecret(given, adminKey));
+  };
 
   if (req.method === 'GET') {
+    if (!mayRead()) return json({ error: 'A password is required to view this directory.', needsReader: true }, 401);
     try {
       const data = await store.get(KEY, { type: 'json' });
       return json(data ?? null);
@@ -48,6 +59,15 @@ export default async (req) => {
   if (req.method === 'POST') {
     let body = {};
     try { body = await req.json(); } catch (e) {}
+    if (body.action === 'reader') {
+      /* Same deliberate delay as the admin check, so guessing is impractical. */
+      await new Promise(r => setTimeout(r, 250));
+      if (!readerKey) return json({ ok: true, open: true });
+      const given = String(body.password || '');
+      if (!sameSecret(given, readerKey) && !(adminKey && sameSecret(given, adminKey)))
+        return json({ error: 'Wrong password.' }, 401);
+      return json({ ok: true });
+    }
     if (body.action !== 'auth') return json({ error: 'Unknown action.' }, 400);
     /* Slow every attempt down equally — makes guessing impractical. */
     await new Promise(r => setTimeout(r, 250));
@@ -65,6 +85,16 @@ export default async (req) => {
     try { body = await req.json(); } catch (e) {}
     if (!body || !looksLikeDirectory(body.data))
       return json({ error: 'That payload does not look like directory data.' }, 400);
+
+    /* Refuse to let a page that never received the stored directory overwrite it.
+       This happens when a deploy or a blip makes the read fail: the page falls back
+       to the built-in starting template, and the first edit would otherwise save
+       that template over real content. */
+    if (body.data.meta && body.data.meta.loadedFrom === 'seed') {
+      let existing = null;
+      try { existing = await store.get(KEY, { type: 'json' }); } catch (e) {}
+      if (existing) return json({ error: 'Stored directory already exists; refusing to overwrite it with the starting template.' }, 409);
+    }
 
     try {
       await store.setJSON(KEY, body.data);
