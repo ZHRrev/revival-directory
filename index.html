@@ -1737,7 +1737,7 @@ function renderPanel(){
       <div class="adminwrap">
         <div class="admin-head">
           <div class="eyebrow">The admin team</div>
-          <h3>Eight people who keep the lights on.</h3>
+          <h3>${DATA.admins.length} people who keep the lights on.</h3>
           <p>${esc(DATA.adminBlurb||'')}</p>
         </div>
         <div class="pgrid">${(DATA.admins||[]).map((a,i)=>adminCard(a,i)).join('')}</div>
