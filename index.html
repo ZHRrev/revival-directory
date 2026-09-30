@@ -111,6 +111,11 @@ a{color:var(--navy)}
 .holder b{font-weight:600;color:var(--ink)}
 .pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:3px 7px;border-radius:4px;white-space:nowrap}
 .pill-vacant{background:#FDF2EA;color:var(--warn)}
+.pill-status{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+  padding:3px 8px;border-radius:999px;white-space:nowrap;font-weight:700}
+.pill-on{background:#E4F3EA;color:#17663A;border:1px solid #BFE3CD}
+.pill-off{background:#F0F1F4;color:#6B7688;border:1px solid #DDE0E6}
+.card-top .pill-status{margin-left:auto}
 .pill-dept{background:var(--accbg,#EAF7FA);color:var(--acc,var(--cyan))}
 .owns{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
 .owns li{font-size:13.5px;color:#33465F;padding-left:15px;position:relative;line-height:1.42}
@@ -181,7 +186,12 @@ a{color:var(--navy)}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(540px,100%);background:var(--paper);z-index:50;transform:translateX(100%);transition:transform .26s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;box-shadow:-20px 0 60px -30px rgba(10,29,59,.6)}
 .drawer.on{transform:none}
 .dr-head{background:var(--ink);color:#fff;padding:20px 22px 18px;position:relative;flex:none}
-.dr-head .pill-dept{background:rgba(255,255,255,.14);color:#fff}
+.dr-head .pill-status{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+  padding:3px 8px;border-radius:999px;white-space:nowrap;font-weight:700}
+.pill-on{background:#E4F3EA;color:#17663A;border:1px solid #BFE3CD}
+.pill-off{background:#F0F1F4;color:#6B7688;border:1px solid #DDE0E6}
+.card-top .pill-status{margin-left:auto}
+.pill-dept{background:rgba(255,255,255,.14);color:#fff}
 .dr-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;font-size:16px;line-height:1}
 .dr-close:hover{background:rgba(255,255,255,.18)}
 .dr-role{font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.02em;margin:12px 44px 0 0;line-height:1.14}
@@ -264,6 +274,9 @@ a{color:var(--navy)}
 .iconbtn{border:1px solid var(--line);background:#fff;border-radius:7px;width:32px;height:32px;cursor:pointer;color:var(--muted);flex:none;line-height:1}
 .iconbtn:hover{background:#FDF4F2;border-color:#E0AFA6;color:#96291B}
 .mrow{display:flex;gap:8px;align-items:center;margin-bottom:7px;flex-wrap:wrap}
+.ordctl{display:inline-flex;gap:3px;margin-left:auto;flex:none}
+.ordctl .iconbtn{width:26px;height:26px;font-size:13px;line-height:1}
+.iconbtn[disabled]{opacity:.28;cursor:default}
 .mrow input{border:1px solid var(--line);border-radius:7px;padding:7px 10px;background:#fff;font-size:13.5px;min-width:0}
 .mrow .mn{flex:2;min-width:130px}
 .mrow .mr{flex:1.2;min-width:100px}
@@ -1541,10 +1554,18 @@ let DRAFT=false, STALE=null;
 PUBLISHED_STAMP = (SEED.meta||{}).savedAt || '';
 /* A stored payload from an older version may not have every top-level key.
    Fall back to the built-in defaults per key rather than rendering nothing. */
-function mergeSaved(saved){
-  const out = Object.assign({}, SEED, saved);
+/* `base` is what to fall back to for anything the incoming file doesn't carry.
+   On first load that's the built-in template. On an import it's what you already
+   have, so a file containing only sites leaves departments and admin alone. */
+const NUMWORDS=['no','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten',
+  'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen','Twenty'];
+function numWord(n){ return NUMWORDS[n] || String(n); }
+
+function mergeSaved(saved, base){
+  const b = base || SEED;
+  const out = Object.assign({}, b, saved);
   ['sites','depts','admins','tasks'].forEach(k=>{
-    if(!Array.isArray(out[k])) out[k] = SEED[k];
+    if(!Array.isArray(out[k])) out[k] = Array.isArray(b[k]) ? b[k] : SEED[k];
   });
   return out;
 }
@@ -1737,7 +1758,7 @@ function renderPanel(){
       <div class="adminwrap">
         <div class="admin-head">
           <div class="eyebrow">The admin team</div>
-          <h3>${DATA.admins.length} people who keep the lights on.</h3>
+          <h3>${numWord((DATA.admins||[]).length)} people who keep the lights on.</h3>
           <p>${esc(DATA.adminBlurb||'')}</p>
         </div>
         <div class="pgrid">${(DATA.admins||[]).map((a,i)=>adminCard(a,i)).join('')}</div>
@@ -1748,6 +1769,13 @@ function renderPanel(){
 /* CRM, site lead and backup. In practice the CRM is often the same person as
    the site lead, so they collapse into one row rather than printing twice.
    Rows with nobody in them are omitted entirely, not shown as "Not set". */
+function isActive(s){ return s.status !== 'inactive'; }
+function statusPill(s){
+  return s.status==='inactive'
+    ? '<span class="pill pill-status pill-off">Inactive</span>'
+    : '<span class="pill pill-status pill-on">Active</span>';
+}
+
 function leadRows(s){
   const nm = o => (o && o.name) ? o.name.trim() : '';
   const crm = nm(s.crm), lead = nm(s.lead), back = nm(s.backup);
@@ -1775,13 +1803,14 @@ function siteCard(s,i,showKind){
         <div class="holder">${esc(s.state)}</div>
       </div>
       ${showKind?'<span class="pill pill-dept">Site</span>':''}
+      ${statusPill(s)}
     </div>
     <div class="areas">${(s.areas||[]).map(x=>`<span class="area">${esc(x)}</span>`).join('')}</div>
     <div class="addr">${ICON.pin}<span>${esc(s.address)}</span></div>
     <div class="rost">
+      <div class="rrow"><span class="rk">PI${(s.pis||[]).length>1?'s':''}</span><span class="rv stack">${(s.pis||[]).length?(s.pis).map(p=>`<span>${esc(p.name)}</span>`).join(''):'<span class="none">Not set</span>'}</span></div>
       ${leadRows(s).map(([label,who])=>`<div class="rrow"><span class="rk">${label}</span><span class="rv">${
         who&&who.name?`<b>${esc(who.name)}</b>`:'<span class="none">Not set</span>'}</span></div>`).join('')}
-      <div class="rrow"><span class="rk">PI${(s.pis||[]).length>1?'s':''}</span><span class="rv stack">${(s.pis||[]).length?(s.pis).map(p=>`<span>${esc(p.name)}</span>`).join(''):'<span class="none">Not set</span>'}</span></div>
       <div class="rrow"><span class="rk">CRCs</span><span class="rv">${crcs.length?crcs.map(c=>esc(c.name)).join(', '):'<span class="none">Not set</span>'}</span></div>
     </div>
     <div class="chain"><span class="bead"></span><span class="arw">→</span><span class="bead hollow"></span>
@@ -1868,25 +1897,25 @@ function showDrawer(a){
 function openSite(id){
   const s=site(id); if(!s) return; const a=acc(s.state);
   $('#drDept').textContent=s.state;
-  $('#drRole').textContent=s.city+(s.hq?' · HQ':'');
+  $('#drRole').textContent=s.city+(s.hq?' · HQ':'')+(isActive(s)?'':' · Inactive');
   $('#drHolder').innerHTML=(s.areas||[]).join(' · ');
   const crcs=(s.team||[]).filter(m=>/crc|clinical research coord/i.test(m.role||''));
   const others=(s.team||[]).filter(m=>!/crc|clinical research coord/i.test(m.role||''));
   $('#drBody').innerHTML=`
     ${s.notes?`<p style="margin:0;font-size:15px;color:#33465F">${esc(s.notes)}</p>`:''}
-    <div class="blk"><p class="blk-t">Location</p>
+    <div class="blk"><p class="blk-t">${esc(s.addrLabel || (DATA.config&&DATA.config.addrLabel) || 'Location')}</p>
       <div class="crow"><span class="ck">Address</span><span>${esc(s.address)}</span></div>
       ${s.phone?`<div class="crow"><span class="ck">Phone</span><a href="tel:${esc(s.phone.replace(/[^\d+]/g,''))}">${esc(s.phone)}</a></div>`:''}
       ${s.map?`<div class="crow"><span class="ck">Map</span><a href="${esc(s.map)}" target="_blank" rel="noopener">Open in Google Maps</a></div>`:''}
     </div>
+    <div class="blk"><p class="blk-t">Principal investigators</p>
+      ${(s.pis||[]).length?`<div class="plist">${s.pis.map(p=>personRow({name:p.name,role:p.area})).join('')}</div>`:'<span class="unset">Not set.</span>'}</div>
     ${(()=>{ const rows=leadRows(s);
         if(!rows.some(([,w])=>w&&w.name))
           return '<div class="blk"><p class="blk-t">Site lead</p><span class="unset">No site lead assigned yet. Add one in Manage.</span></div>';
         return rows.filter(([,w])=>w&&w.name).map(([label,w])=>
           `<div class="blk"><p class="blk-t">${label}</p>${personRow({name:w.name,role:w.title||label,email:w.email,phone:w.phone})}</div>`).join('');
       })()}
-    <div class="blk"><p class="blk-t">Principal investigators</p>
-      ${(s.pis||[]).length?`<div class="plist">${s.pis.map(p=>personRow({name:p.name,role:p.area})).join('')}</div>`:'<span class="unset">Not set.</span>'}</div>
     <div class="blk"><p class="blk-t">Coordinators${crcs.length?' · '+crcs.length:''}</p>
       ${crcs.length?`<div class="plist">${crcs.map(m=>personRow(m)).join('')}</div>`:'<span class="unset">No coordinators listed yet.</span>'}</div>
     ${others.length?`<div class="blk"><p class="blk-t">Other site staff</p><div class="plist">${others.map(m=>personRow(m)).join('')}</div></div>`:''}`;
@@ -2041,6 +2070,29 @@ function renderAdmin(){
 }
 
 /* member row editor (shared by sites + depts) */
+/* Move an item within its array. Returns true if anything actually moved. */
+function moveItem(arr, from, to){
+  if(to<0 || to>=arr.length || from===to) return false;
+  arr.splice(to, 0, arr.splice(from, 1)[0]);
+  return true;
+}
+/* A copy with a fresh id, so the original is never disturbed. */
+function duplicateItem(arr, i, label){
+  const copy = JSON.parse(JSON.stringify(arr[i]));
+  if(copy.id) copy.id = copy.id.replace(/-copy\d*$/,'') + '-copy' + Date.now().toString(36).slice(-4);
+  if(label && copy[label]) copy[label] = copy[label] + ' (copy)';
+  arr.splice(i+1, 0, copy);
+  return copy;
+}
+/* Up / down / duplicate buttons shared by every accordion list. */
+function ordCtl(kind, i, total){
+  return `<span class="ordctl">
+    <button class="iconbtn" data-ord="${kind}:${i}:-1" ${i===0?'disabled':''} title="Move up" aria-label="Move up">↑</button>
+    <button class="iconbtn" data-ord="${kind}:${i}:1" ${i===total-1?'disabled':''} title="Move down" aria-label="Move down">↓</button>
+    <button class="iconbtn" data-dup="${kind}:${i}" title="Duplicate" aria-label="Duplicate">⧉</button>
+  </span>`;
+}
+
 function memberRows(arr, tag){
   return `<div id="${tag}">${arr.map((m,j)=>`
     <div class="mrow">
@@ -2048,6 +2100,9 @@ function memberRows(arr, tag){
       <input class="mr" data-m="${tag}" data-j="${j}" data-f="role" value="${esc(m.role||'')}" placeholder="Role e.g. CRC">
       <input class="me" data-m="${tag}" data-j="${j}" data-f="email" value="${esc(m.email||'')}" placeholder="Email">
       <input class="mp" data-m="${tag}" data-j="${j}" data-f="phone" value="${esc(m.phone||'')}" placeholder="Phone">
+      <button class="iconbtn" data-mmove="${tag}:${j}:-1" ${j===0?'disabled':''} title="Move up" aria-label="Move up">↑</button>
+      <button class="iconbtn" data-mmove="${tag}:${j}:1" ${j===arr.length-1?'disabled':''} title="Move down" aria-label="Move down">↓</button>
+      <button class="iconbtn" data-mdup="${tag}:${j}" title="Duplicate" aria-label="Duplicate">⧉</button>
       <button class="iconbtn" data-mdel="${tag}" data-j="${j}" aria-label="Remove">×</button>
     </div>`).join('')}</div>
     <button class="btn btn-sm" data-madd="${tag}">+ Add person</button>`;
@@ -2061,6 +2116,45 @@ function wireMembers(root, getArr, rerender){
   });
   root.querySelectorAll('[data-madd]').forEach(el=>{
     el.onclick=()=>{ getArr(el.dataset.madd).push({name:'',role:'',email:'',phone:''}); dirty(); rerender(); };
+  });
+  root.querySelectorAll('[data-mmove]').forEach(el=>{
+    el.onclick=e=>{ e.preventDefault();
+      const [tag,j,d]=el.dataset.mmove.split(':');
+      if(moveItem(getArr(tag), +j, +j + +d)){ dirty(); rerender(); }
+    };
+  });
+  root.querySelectorAll('[data-mdup]').forEach(el=>{
+    el.onclick=e=>{ e.preventDefault();
+      const [tag,j]=el.dataset.mdup.split(':');
+      duplicateItem(getArr(tag), +j, 'name'); dirty(); rerender();
+    };
+  });
+}
+
+const ORD = {
+  sites:  {arr:()=>DATA.sites,  label:'city', pane:()=>paneSites()},
+  depts:  {arr:()=>DATA.depts,  label:'name', pane:()=>paneDepts()},
+  admins: {arr:()=>DATA.admins, label:'name', pane:()=>panePeople()},
+};
+function wireOrder(p){
+  /* These live inside the accordion header button, which toggles open on click,
+     so stop the event before it gets there. */
+  p.querySelectorAll('[data-ord]').forEach(el=>{
+    el.onclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      const [kind,i,d]=el.dataset.ord.split(':');
+      const cfg=ORD[kind];
+      if(moveItem(cfg.arr(), +i, +i + +d)){ dirty(); cfg.pane(); toast('Moved'); }
+    };
+  });
+  p.querySelectorAll('[data-dup]').forEach(el=>{
+    el.onclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      const [kind,i]=el.dataset.dup.split(':');
+      const cfg=ORD[kind];
+      duplicateItem(cfg.arr(), +i, cfg.label);
+      dirty(); cfg.pane(); toast('Duplicated — the copy is right below');
+    };
   });
 }
 
@@ -2126,9 +2220,14 @@ function paneSites(){
         <button class="acc-h" data-toggle="${i}">
           <span style="width:9px;height:9px;border-radius:50%;background:${acc(s.state)};flex:none"></span>
           <span style="min-width:0"><span class="role" style="display:block">${esc(s.city)}</span>
-          <span class="holder">${esc(s.state)} · ${(s.team||[]).length} on roster · ${s.lead&&s.lead.name?esc(s.lead.name):'<em style="color:var(--muted-2)">no lead</em>'}</span></span>
+          <span class="holder">${esc(s.state)} · ${(s.team||[]).length} on roster · ${s.lead&&s.lead.name?esc(s.lead.name):'<em style="color:var(--muted-2)">no lead</em>'}${isActive(s)?'':' · inactive'}</span></span>
+          ${ordCtl('sites', i, (DATA.sites||[]).length)}
           <span class="caret">▾</span></button>
         <div class="acc-b"><div class="fgrid">
+          <div class="f"><label>Status</label><select data-sk="status" data-i="${i}">
+            <option value="active" ${isActive(s)?'selected':''}>Active</option>
+            <option value="inactive" ${isActive(s)?'':'selected'}>Inactive</option></select></div>
+          <div class="f"><label>Heading for the address block</label><input data-sk="addrLabel" data-i="${i}" value="${esc(s.addrLabel||'')}" placeholder="Location"></div>
           <div class="f"><label>City</label><input data-sk="city" data-i="${i}" value="${esc(s.city)}"></div>
           <div class="f"><label>State / country</label><input data-sk="state" data-i="${i}" value="${esc(s.state)}"></div>
           <div class="f full"><label>Address</label><input data-sk="address" data-i="${i}" value="${esc(s.address)}"></div>
@@ -2161,12 +2260,19 @@ function paneSites(){
 
   p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>el.closest('.acc').classList.toggle('open'));
   applyJump('sites', p);
+  wireOrder(p);
   p.querySelectorAll('[data-sk]').forEach(el=>{
-    el.oninput=()=>{ const i=+el.dataset.i,k=el.dataset.sk,v=el.value;
+    const apply=()=>{ const i=+el.dataset.i,k=el.dataset.sk,v=el.value;
       if(k==='areas') DATA.sites[i].areas=v.split(',').map(x=>x.trim()).filter(Boolean);
       else if(k==='pis') DATA.sites[i].pis=lines(v).map(l=>{ const m=l.split(/\s+[—–-]\s+/); return {name:m[0].trim(), area:(m[1]||'').trim()}; });
       else DATA.sites[i][k]=v;
-      dirty(); };
+      dirty();
+      /* The status badge and the accordion summary both reflect this. */
+      if(k==='status'){ const open=[...p.querySelectorAll('.acc')].map(a=>a.classList.contains('open'));
+        paneSites(); [...$('#apane').querySelectorAll('.acc')].forEach((a,n)=>{ if(open[n]) a.classList.add('open'); }); }
+    };
+    el.oninput=apply;
+    el.onchange=apply;   /* a <select> fires change, not input, in some browsers */
   });
   p.querySelectorAll('[data-lk]').forEach(el=>{
     el.oninput=()=>{ const i=+el.dataset.i; DATA.sites[i].lead=DATA.sites[i].lead||{}; DATA.sites[i].lead[el.dataset.lk]=el.value; dirty(); };
@@ -2200,6 +2306,7 @@ function paneDepts(){
           <span style="width:9px;height:9px;border-radius:50%;background:${esc(d.accent)};flex:none"></span>
           <span style="min-width:0"><span class="role" style="display:block">${esc(d.name)}</span>
           <span class="holder">${d.head&&d.head.name?esc(d.head.name):'<em style="color:var(--muted-2)">no lead</em>'} · ${(d.team||[]).length+((d.head&&d.head.name)?1:0)} people</span></span>
+          ${ordCtl('depts', i, (DATA.depts||[]).length)}
           <span class="caret">▾</span></button>
         <div class="acc-b"><div class="fgrid">
           <div class="f"><label>Department name</label><input data-dk="name" data-i="${i}" value="${esc(d.name)}"></div>
@@ -2222,6 +2329,7 @@ function paneDepts(){
 
   p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>el.closest('.acc').classList.toggle('open'));
   applyJump('depts', p);
+  wireOrder(p);
   p.querySelectorAll('[data-dk]').forEach(el=>{
     const h=()=>{ const i=+el.dataset.i,k=el.dataset.dk,v=el.value;
       if(k==='handles'||k==='avoid') DATA.depts[i][k]=lines(v);
@@ -2272,6 +2380,7 @@ function panePeople(){
           <span class="pav" style="width:28px;height:28px;font-size:11px">${a.photo?`<img src="${esc(a.photo)}" alt="">`:esc(initials(a.name))}</span>
           <span style="min-width:0"><span class="role" style="display:block">${esc(a.name)}</span>
           <span class="holder">${a.title?esc(a.title):'<em style="color:var(--muted-2)">title not set</em>'}</span></span>
+          ${ordCtl('admins', i, (DATA.admins||[]).length)}
           <span class="caret">▾</span></button>
         <div class="acc-b">
           <div class="photoedit">
@@ -2296,6 +2405,7 @@ function panePeople(){
 
   p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>el.closest('.acc').classList.toggle('open'));
   applyJump('people', p);
+  wireOrder(p);
   $('#abl').oninput=e=>{ DATA.adminBlurb=e.target.value; dirty(); };
   p.querySelectorAll('[data-ak]').forEach(el=>{
     el.oninput=()=>{ DATA.admins[+el.dataset.i][el.dataset.ak]=el.value; dirty(); };
@@ -2510,8 +2620,11 @@ $('#importBtn').onclick=()=>{
   inp.onchange=()=>{ const f=inp.files[0]; if(!f) return;
     const r=new FileReader();
     r.onload=()=>{ try{ const d=JSON.parse(r.result);
-        if(!d.sites||!d.depts||!d.admins) throw new Error('shape');
-        DATA=mergeSaved(d); renderAll(); renderAdmin(); note('Imported. Publish to make it live.','ok');
+        const parts=['sites','depts','admins','tasks'].filter(k=>Array.isArray(d[k]));
+        if(!parts.length) throw new Error('shape');
+        DATA=mergeSaved(d, DATA); renderAll(); renderAdmin();
+        const named={sites:'sites',depts:'departments',admins:'admin team',tasks:'quick tasks'};
+        note('Imported '+parts.map(k=>named[k]).join(', ')+'. Nothing else was touched. Publish to make it live.','ok');
       }catch(err){ note("That file isn't a directory export.",'err'); } };
     r.readAsText(f); };
   inp.click();
