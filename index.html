@@ -293,6 +293,9 @@ a{color:var(--navy)}
 .photoprev .mono{font-size:22px}
 
 .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;z-index:70;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:0 12px 30px -10px rgba(10,29,59,.6)}
+.toast-undo{margin-left:10px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);
+  color:#fff;font:inherit;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;cursor:pointer}
+.toast-undo:hover{background:rgba(255,255,255,.3)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
 @media (max-width:640px){
@@ -399,6 +402,8 @@ a{color:var(--navy)}
     <div class="sheet-foot">
       <span class="savenote" id="saveNote">Changes go live for everyone on this link.</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" id="undoBtn" disabled>&#8630; Undo</button>
+        <button class="btn btn-sm" id="redoBtn" disabled>&#8631; Redo</button>
         <button class="btn btn-sm" id="siteBtn">Download site file</button>
         <button class="btn btn-sm" id="exportBtn">Export JSON</button>
         <button class="btn btn-sm" id="importBtn">Import JSON</button>
@@ -1555,7 +1560,10 @@ const site = id => DATA.sites.find(s=>s.id===id);
 const dept = id => DATA.depts.find(d=>d.id===id);
 const adm  = id => DATA.admins.find(a=>a.id===id);
 
-function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2400); }
+$('#undoBtn') && ($('#undoBtn').onclick=()=>undo());
+$('#redoBtn') && ($('#redoBtn').onclick=()=>redo());
+
+function toast(m){ const t=$('#toast'); t.innerHTML=''; t.textContent=m; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2400); }
 
 const ICON = {
   pin:'<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 14.5S13 10 13 6.5a5 5 0 1 0-10 0C3 10 8 14.5 8 14.5Z"/><circle cx="8" cy="6.4" r="1.9"/></svg>',
@@ -1739,7 +1747,7 @@ function hits(q){
   const out = [];
   (DATA.sites||[]).forEach(s=>{
     const hay = [s.city,s.state,s.address,(s.areas||[]).join(' '),(s.pis||[]).map(p=>p.name+' '+p.area).join(' '),
-                 s.lead&&s.lead.name, s.crm&&s.crm.name, s.backup&&s.backup.name,
+                 slotNames(s.lead).join(' '), slotNames(s.crm).join(' '), slotNames(s.backup).join(' '),
                  (s.team||[]).map(m=>m.name+' '+m.role).join(' '),s.notes].join(' ').toLowerCase();
     if(hay.includes(q)) out.push({kind:'site', id:s.id, s: String(s.city).toLowerCase().includes(q)?3:1});
   });
@@ -1818,6 +1826,23 @@ function statusPill(s){
     : '<span class="pill pill-status pill-on">Active</span>';
 }
 
+/* A site lead slot may name more than one person. Names, titles, emails and
+   phones are each comma-separated and matched up by position, so two leads keep
+   their own contact details. One email with two names applies to the first. */
+function slotPeople(o){
+  if(!o || !o.name) return [];
+  const cut = v => String(v||'').split(',').map(x=>x.trim());
+  const names = cut(o.name).filter(Boolean);
+  const titles = cut(o.title), emails = cut(o.email), phones = cut(o.phone);
+  return names.map((n,i)=>({
+    name:n,
+    title:(titles[i]!==undefined && titles[i]!=='') ? titles[i] : (names.length>1 ? '' : titles[0]||''),
+    email:emails[i]||'',
+    phone:phones[i]||''
+  }));
+}
+const slotNames = o => slotPeople(o).map(p=>p.name);
+
 function leadRows(s){
   const nm = o => (o && o.name) ? o.name.trim() : '';
   const crm = nm(s.crm), lead = nm(s.lead), back = nm(s.backup);
@@ -1851,8 +1876,11 @@ function siteCard(s,i,showKind){
     <div class="addr">${ICON.pin}<span>${esc(s.address)}</span></div>
     <div class="rost">
       <div class="rrow"><span class="rk">PI${(s.pis||[]).length>1?'s':''}</span><span class="rv stack">${(s.pis||[]).length?(s.pis).map(p=>`<span>${esc(p.name)}</span>`).join(''):'<span class="none">Not set</span>'}</span></div>
-      ${leadRows(s).map(([label,who])=>`<div class="rrow"><span class="rk">${label}</span><span class="rv">${
-        who&&who.name?`<b>${esc(who.name)}</b>`:'<span class="none">Not set</span>'}</span></div>`).join('')}
+      ${leadRows(s).map(([label,who])=>{
+        const ppl = slotPeople(who);
+        return `<div class="rrow"><span class="rk">${label}${ppl.length>1?'s':''}</span><span class="rv${ppl.length>1?' stack':''}">${
+          ppl.length ? ppl.map(p=>`<b>${esc(p.name)}</b>`).join('') : '<span class="none">Not set</span>'}</span></div>`;
+      }).join('')}
       <div class="rrow"><span class="rk">CRCs</span><span class="rv">${crcs.length?crcs.map(c=>esc(c.name)).join(', '):'<span class="none">Not set</span>'}</span></div>
     </div>
     <div class="chain"><span class="bead"></span><span class="arw">→</span><span class="bead hollow"></span>
@@ -1957,8 +1985,11 @@ function openSite(id){
     ${(()=>{ const rows=leadRows(s);
         if(!rows.some(([,w])=>w&&w.name))
           return '<div class="blk"><p class="blk-t">Site lead</p><span class="unset">No site lead assigned yet. Add one in Manage.</span></div>';
-        return rows.filter(([,w])=>w&&w.name).map(([label,w])=>
-          `<div class="blk"><p class="blk-t">${label}</p>${personRow({name:w.name,role:w.title||label,email:w.email,phone:w.phone})}</div>`).join('');
+        return rows.filter(([,w])=>w&&w.name).map(([label,w])=>{
+          const ppl=slotPeople(w);
+          return `<div class="blk"><p class="blk-t">${label}${ppl.length>1?'s':''}</p><div class="plist">${
+            ppl.map(p=>personRow({name:p.name, role:p.title||label, email:p.email, phone:p.phone})).join('')}</div></div>`;
+        }).join('');
       })()}
     <div class="blk"><p class="blk-t">Coordinators${crcs.length?' · '+crcs.length:''}</p>
       ${crcs.length?`<div class="plist">${crcs.map(m=>personRow(m)).join('')}</div>`:'<span class="unset">No coordinators listed yet.</span>'}</div>
@@ -2059,6 +2090,78 @@ function closeAdmin(){ $('#admin').classList.remove('on'); }
 $('#admin').addEventListener('click', e=>{ if(e.target===$('#admin')) closeAdmin(); });
 function note(m,k){ const n=$('#saveNote'); n.textContent=m; n.className='savenote'+(k?' '+k:''); }
 let UNSAVED=false, autoT=null;
+/* ── Undo ────────────────────────────────────────────────────────────
+   A stack of whole-directory snapshots. Structural actions (delete, add,
+   duplicate, reorder, import) push one each; typing is coalesced so a
+   sentence is one undo step, not forty. Undo writes through to storage the
+   same way any edit does, so it survives a reload. */
+const HIST=[], FUT=[]; const HIST_MAX=25;
+let typingMark=null;
+
+function snapshot(label){
+  HIST.push({json:JSON.stringify(DATA), label:label||'that change'});
+  if(HIST.length>HIST_MAX) HIST.shift();
+  FUT.length=0;
+  renderUndo();
+}
+/* For text fields: one snapshot per burst of typing in the same field. */
+function markTyping(key,label){
+  if(typingMark && typingMark.key===key && Date.now()-typingMark.at < 2500){
+    typingMark.at=Date.now(); return;
+  }
+  typingMark={key, at:Date.now()};
+  snapshot(label);
+}
+function applyHistory(from,to){
+  if(!from.length) return false;
+  const step=from.pop();
+  to.push({json:JSON.stringify(DATA), label:step.label});
+  DATA=JSON.parse(step.json);
+  renderAll();
+  if(UNLOCKED) renderAdmin();
+  renderUndo();
+  UNSAVED=true; STALE=null;
+  clearTimeout(autoT); autoT=setTimeout(autosave,400);
+  return step.label;
+}
+function undo(){
+  const l=applyHistory(HIST,FUT);
+  toast(l?('Undone: '+l):'Nothing to undo');
+}
+function redo(){
+  const l=applyHistory(FUT,HIST);
+  toast(l?('Redone: '+l):'Nothing to redo');
+}
+function renderUndo(){
+  const u=$('#undoBtn'), r=$('#redoBtn');
+  if(!u) return;
+  u.disabled=!HIST.length; r.disabled=!FUT.length;
+  u.title = HIST.length ? ('Undo '+HIST[HIST.length-1].label) : 'Nothing to undo';
+  r.title = FUT.length ? ('Redo '+FUT[FUT.length-1].label) : 'Nothing to redo';
+}
+/* A deletion is the one people panic about, so offer the undo inline. */
+function toastUndo(msg){
+  const t=$('#toast');
+  t.innerHTML='';
+  t.append(msg+' ');
+  const b=document.createElement('button');
+  b.className='toast-undo'; b.textContent='Undo';
+  b.onclick=()=>{ undo(); t.classList.remove('on'); };
+  t.append(b);
+  t.classList.add('on');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),6000);
+}
+
+document.addEventListener('keydown',e=>{
+  const z = (e.key==='z'||e.key==='Z') && (e.metaKey||e.ctrlKey);
+  if(!z) return;
+  const el=document.activeElement;
+  /* let the browser handle undo inside a field the person is typing in */
+  if(el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && !e.shiftKey) return;
+  e.preventDefault();
+  e.shiftKey ? redo() : undo();
+});
+
 function dirty(){
   UNSAVED=true; STALE=null;
   note('Unsaved changes…');
@@ -2166,23 +2269,30 @@ function memberRows(arr, tag){
 }
 function wireMembers(root, getArr, rerender){
   root.querySelectorAll('[data-m]').forEach(el=>{
-    el.oninput=()=>{ getArr(el.dataset.m)[+el.dataset.j][el.dataset.f]=el.value; dirty(); };
+    el.oninput=()=>{ markTyping('m'+el.dataset.m+el.dataset.j+el.dataset.f, 'that edit');
+      getArr(el.dataset.m)[+el.dataset.j][el.dataset.f]=el.value; dirty(); };
   });
   root.querySelectorAll('[data-mdel]').forEach(el=>{
-    el.onclick=()=>{ getArr(el.dataset.mdel).splice(+el.dataset.j,1); dirty(); rerender(); };
+    el.onclick=()=>{ const arr=getArr(el.dataset.mdel), j=+el.dataset.j;
+      const nm=(arr[j]&&arr[j].name)||'that person';
+      snapshot('removing '+nm);
+      arr.splice(j,1); dirty(); rerender(); toastUndo('Removed '+nm+'.'); };
   });
   root.querySelectorAll('[data-madd]').forEach(el=>{
-    el.onclick=()=>{ getArr(el.dataset.madd).push({name:'',role:'',email:'',phone:''}); dirty(); rerender(); };
+    el.onclick=()=>{ snapshot('adding a row'); getArr(el.dataset.madd).push({name:'',role:'',email:'',phone:''}); dirty(); rerender(); };
   });
   root.querySelectorAll('[data-mmove]').forEach(el=>{
     el.onclick=e=>{ e.preventDefault();
       const [tag,j,d]=el.dataset.mmove.split(':');
+      snapshot('that move');
       if(moveItem(getArr(tag), +j, +j + +d)){ dirty(); rerender(); }
+      else HIST.pop();
     };
   });
   root.querySelectorAll('[data-mdup]').forEach(el=>{
     el.onclick=e=>{ e.preventDefault();
       const [tag,j]=el.dataset.mdup.split(':');
+      snapshot('that duplicate');
       duplicateItem(getArr(tag), +j, 'name'); dirty(); rerender();
     };
   });
@@ -2201,7 +2311,9 @@ function wireOrder(p){
       e.preventDefault(); e.stopPropagation();
       const [kind,i,d]=el.dataset.ord.split(':');
       const cfg=ORD[kind];
+      snapshot('that move');
       if(moveItem(cfg.arr(), +i, +i + +d)){ dirty(); cfg.pane(); toast('Moved'); }
+      else HIST.pop();
     };
   });
   p.querySelectorAll('[data-dup]').forEach(el=>{
@@ -2209,6 +2321,7 @@ function wireOrder(p){
       e.preventDefault(); e.stopPropagation();
       const [kind,i]=el.dataset.dup.split(':');
       const cfg=ORD[kind];
+      snapshot('that duplicate');
       duplicateItem(cfg.arr(), +i, cfg.label);
       dirty(); cfg.pane(); toast('Duplicated — the copy is right below');
     };
@@ -2227,7 +2340,7 @@ function paneGaps(){
   const G=[];
   (DATA.sites||[]).forEach((s,i)=>{
     const crcs=(s.team||[]).filter(m=>/crc|clinical research coord/i.test(m.role||'')&&m.name);
-    if(!(s.lead&&s.lead.name)) G.push({pane:'sites',i,label:s.city+' \u2014 no site lead',w:3});
+    if(!slotNames(s.lead).length) G.push({pane:'sites',i,label:s.city+' \u2014 no site lead',w:3});
     if(!crcs.length)           G.push({pane:'sites',i,label:s.city+' \u2014 no coordinators listed',w:2});
     if(!s.phone)               G.push({pane:'sites',i,label:s.city+' \u2014 no phone number',w:1});
     if(!(s.pis||[]).length)    G.push({pane:'sites',i,label:s.city+' \u2014 no principal investigator',w:2});
@@ -2300,15 +2413,15 @@ function paneSites(){
             <textarea data-sk="pis" data-i="${i}" placeholder="One per line: Dr. Name — Specialty">${esc((s.pis||[]).map(x=>x.name+(x.area?' — '+x.area:'')).join('\n'))}</textarea>
             <span class="hint">One per line. Use an em dash or hyphen to add the specialty.</span></div>
           <div class="f full"><label>Note</label><input data-sk="notes" data-i="${i}" value="${esc(s.notes||'')}"></div>
-          <div class="f"><label>Site lead — name</label><input data-lk="name" data-i="${i}" value="${esc(s.lead?s.lead.name:'')}"></div>
+          <div class="f"><label>Site lead — name</label><input data-lk="name" data-i="${i}" value="${esc(s.lead?s.lead.name:'')}" placeholder="Two leads? Separate with a comma"></div>
           <div class="f"><label>Site lead — title</label><input data-lk="title" data-i="${i}" value="${esc(s.lead?s.lead.title:'')}"></div>
-          <div class="f"><label>Site lead — email</label><input data-lk="email" data-i="${i}" value="${esc(s.lead?s.lead.email:'')}"></div>
+          <div class="f"><label>Site lead — email</label><input data-lk="email" data-i="${i}" value="${esc(s.lead?s.lead.email:'')}" placeholder="Match the order of the names"></div>
           <div class="f"><label>Site lead — phone</label><input data-lk="phone" data-i="${i}" value="${esc(s.lead?s.lead.phone:'')}"></div>
-          <div class="f"><label>CRM — name</label><input data-ck="name" data-i="${i}" value="${esc(s.crm?s.crm.name:'')}" placeholder="Leave blank if none"></div>
+          <div class="f"><label>CRM — name</label><input data-ck="name" data-i="${i}" value="${esc(s.crm?s.crm.name:'')}" placeholder="Blank if none · comma for two"></div>
           <div class="f"><label>CRM — title</label><input data-ck="title" data-i="${i}" value="${esc(s.crm?s.crm.title:'')}"></div>
           <div class="f"><label>CRM — email</label><input data-ck="email" data-i="${i}" value="${esc(s.crm?s.crm.email:'')}"></div>
           <div class="f"><label>CRM — phone</label><input data-ck="phone" data-i="${i}" value="${esc(s.crm?s.crm.phone:'')}"></div>
-          <div class="f"><label>Backup lead — name</label><input data-bk="name" data-i="${i}" value="${esc(s.backup?s.backup.name:'')}" placeholder="Leave blank if none"></div>
+          <div class="f"><label>Backup lead — name</label><input data-bk="name" data-i="${i}" value="${esc(s.backup?s.backup.name:'')}" placeholder="Blank if none · comma for two"></div>
           <div class="f"><label>Backup lead — title</label><input data-bk="title" data-i="${i}" value="${esc(s.backup?s.backup.title:'')}"></div>
           <div class="f"><label>Backup lead — email</label><input data-bk="email" data-i="${i}" value="${esc(s.backup?s.backup.email:'')}"></div>
           <div class="f"><label>Backup lead — phone</label><input data-bk="phone" data-i="${i}" value="${esc(s.backup?s.backup.phone:'')}"></div>
@@ -2325,6 +2438,7 @@ function paneSites(){
   wireOrder(p);
   p.querySelectorAll('[data-sk]').forEach(el=>{
     const apply=()=>{ const i=+el.dataset.i,k=el.dataset.sk,v=el.value;
+      markTyping('site'+i+k, 'that edit to '+(DATA.sites[i].city||'the site'));
       if(k==='areas') DATA.sites[i].areas=v.split(',').map(x=>x.trim()).filter(Boolean);
       else if(k==='pis') DATA.sites[i].pis=lines(v).map(l=>{ const m=l.split(/\s+[—–-]\s+/); return {name:m[0].trim(), area:(m[1]||'').trim()}; });
       else DATA.sites[i][k]=v;
@@ -2345,11 +2459,14 @@ function paneSites(){
     };
   });
   p.querySelectorAll('[data-lk]').forEach(el=>{
-    el.oninput=()=>{ const i=+el.dataset.i; DATA.sites[i].lead=DATA.sites[i].lead||{}; DATA.sites[i].lead[el.dataset.lk]=el.value; dirty(); };
+    el.oninput=()=>{ const i=+el.dataset.i;
+      markTyping('lead'+i+el.dataset.lk, 'that edit to the site lead');
+      DATA.sites[i].lead=DATA.sites[i].lead||{}; DATA.sites[i].lead[el.dataset.lk]=el.value; dirty(); };
   });
   [['data-ck','crm'],['data-bk','backup']].forEach(([attr,key])=>{
     p.querySelectorAll('['+attr+']').forEach(el=>{
       el.oninput=()=>{ const i=+el.dataset.i;
+        markTyping(key+i+el.getAttribute(attr), 'that edit to the '+key);
         DATA.sites[i][key]=DATA.sites[i][key]||{};
         DATA.sites[i][key][el.getAttribute(attr)]=el.value; dirty(); };
     });
@@ -2358,11 +2475,13 @@ function paneSites(){
     ()=>{ const open=[...p.querySelectorAll('.acc')].map(a=>a.classList.contains('open')); paneSites();
           [...$('#apane').querySelectorAll('.acc')].forEach((a,k)=>{ if(open[k]) a.classList.add('open'); }); });
   p.querySelectorAll('[data-sdel]').forEach(el=>{
-    el.onclick=()=>{ if(el.dataset.armed){ const i=+el.dataset.sdel, id=DATA.sites[i].id;
-        DATA.sites.splice(i,1); DATA.tasks=(DATA.tasks||[]).filter(t=>t.to!=='site:'+id); dirty(); paneSites(); }
+    el.onclick=()=>{ if(el.dataset.armed){ const i=+el.dataset.sdel, id=DATA.sites[i].id, nm=DATA.sites[i].city;
+        snapshot('removing '+nm);
+        DATA.sites.splice(i,1); DATA.tasks=(DATA.tasks||[]).filter(t=>t.to!=='site:'+id); dirty(); paneSites();
+        toastUndo('Removed '+nm+'.'); }
       else { el.dataset.armed='1'; el.textContent='Tap again to confirm'; setTimeout(()=>{ if(el.isConnected){ delete el.dataset.armed; el.textContent='Delete this site'; } },3500); } };
   });
-  $('#addS').onclick=()=>{ DATA.sites.push({ id:uid('site',DATA.sites), city:'New site', state:'Michigan', address:'', map:'', phone:'', areas:[], pis:[], lead:{name:'',title:'Site Lead',email:'',phone:''}, team:[], notes:'' });
+  $('#addS').onclick=()=>{ snapshot('adding a site'); DATA.sites.push({ id:uid('site',DATA.sites), city:'New site', state:'Michigan', address:'', map:'', phone:'', areas:[], pis:[], lead:{name:'',title:'Site Lead',email:'',phone:''}, team:[], notes:'' });
     dirty(); paneSites(); const last=$('#apane').querySelector('.acc:last-of-type'); if(last){ last.classList.add('open'); if(last.scrollIntoView) last.scrollIntoView({block:'center'}); } };
 }
 
@@ -2402,6 +2521,7 @@ function paneDepts(){
   wireOrder(p);
   p.querySelectorAll('[data-dk]').forEach(el=>{
     const h=()=>{ const i=+el.dataset.i,k=el.dataset.dk,v=el.value;
+      markTyping('dept'+i+k, 'that edit to '+(DATA.depts[i].name||'the department'));
       if(k==='handles'||k==='avoid') DATA.depts[i][k]=lines(v);
       else if(k==='keywords') DATA.depts[i][k]=v.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
       else DATA.depts[i][k]=v; dirty(); };
@@ -2414,11 +2534,13 @@ function paneDepts(){
     ()=>{ const open=[...p.querySelectorAll('.acc')].map(a=>a.classList.contains('open')); paneDepts();
           [...$('#apane').querySelectorAll('.acc')].forEach((a,k)=>{ if(open[k]) a.classList.add('open'); }); });
   p.querySelectorAll('[data-ddel]').forEach(el=>{
-    el.onclick=()=>{ if(el.dataset.armed){ const i=+el.dataset.ddel, id=DATA.depts[i].id;
-        DATA.depts.splice(i,1); DATA.tasks=(DATA.tasks||[]).filter(t=>t.to!=='dept:'+id); dirty(); paneDepts(); }
+    el.onclick=()=>{ if(el.dataset.armed){ const i=+el.dataset.ddel, id=DATA.depts[i].id, nm=DATA.depts[i].name;
+        snapshot('removing '+nm);
+        DATA.depts.splice(i,1); DATA.tasks=(DATA.tasks||[]).filter(t=>t.to!=='dept:'+id); dirty(); paneDepts();
+        toastUndo('Removed '+nm+'.'); }
       else { el.dataset.armed='1'; el.textContent='Tap again to confirm'; setTimeout(()=>{ if(el.isConnected){ delete el.dataset.armed; el.textContent='Delete this department'; } },3500); } };
   });
-  $('#addD').onclick=()=>{ DATA.depts.push({ id:uid('dept',DATA.depts), name:'New department', accent:'#4A6B8A', purpose:'', head:{name:'',title:'',email:'',phone:''}, team:[], handles:[], avoid:[], escalate:'', authority:'', keywords:[] });
+  $('#addD').onclick=()=>{ snapshot('adding a department'); DATA.depts.push({ id:uid('dept',DATA.depts), name:'New department', accent:'#4A6B8A', purpose:'', head:{name:'',title:'',email:'',phone:''}, team:[], handles:[], avoid:[], escalate:'', authority:'', keywords:[] });
     dirty(); paneDepts(); const last=$('#apane').querySelector('.acc:last-of-type'); if(last){ last.classList.add('open'); if(last.scrollIntoView) last.scrollIntoView({block:'center'}); } };
 }
 
@@ -2478,10 +2600,12 @@ function panePeople(){
   wireOrder(p);
   $('#abl').oninput=e=>{ DATA.adminBlurb=e.target.value; dirty(); };
   p.querySelectorAll('[data-ak]').forEach(el=>{
-    el.oninput=()=>{ DATA.admins[+el.dataset.i][el.dataset.ak]=el.value; dirty(); };
+    el.oninput=()=>{ const i=+el.dataset.i;
+      markTyping('adm'+i+el.dataset.ak, 'that edit to '+(DATA.admins[i].name||'the admin team'));
+      DATA.admins[i][el.dataset.ak]=el.value; dirty(); };
   });
   p.querySelectorAll('[data-up]').forEach(el=>{
-    el.onclick=()=>{ const i=+el.dataset.up, inp=document.createElement('input');
+    el.onclick=()=>{ snapshot('that photo change'); const i=+el.dataset.up, inp=document.createElement('input');
       inp.type='file'; inp.accept='image/*';
       inp.onchange=()=>{ const f=inp.files[0]; if(!f) return;
         squareThumb(f, url=>{ if(!url){ note("Couldn't read that image.",'err'); return; }
@@ -2492,11 +2616,13 @@ function panePeople(){
     el.onclick=()=>{ DATA.admins[+el.dataset.rmphoto].photo=''; dirty(); renderPanel(); reopenPeople(); };
   });
   p.querySelectorAll('[data-adel]').forEach(el=>{
-    el.onclick=()=>{ if(el.dataset.armed){ const i=+el.dataset.adel, id=DATA.admins[i].id;
-        DATA.admins.splice(i,1); DATA.tasks=(DATA.tasks||[]).filter(t=>t.to!=='admin:'+id); dirty(); renderPanel(); panePeople(); }
+    el.onclick=()=>{ if(el.dataset.armed){ const i=+el.dataset.adel, id=DATA.admins[i].id, nm=DATA.admins[i].name||'that person';
+        snapshot('removing '+nm);
+        DATA.admins.splice(i,1); DATA.tasks=(DATA.tasks||[]).filter(t=>t.to!=='admin:'+id); dirty(); renderPanel(); panePeople();
+        toastUndo('Removed '+nm+'.'); }
       else { el.dataset.armed='1'; el.textContent='Tap again to confirm'; setTimeout(()=>{ if(el.isConnected){ delete el.dataset.armed; el.textContent='Remove from the team'; } },3500); } };
   });
-  $('#addA').onclick=()=>{ DATA.admins.push({ id:uid('person',DATA.admins), name:'New person', title:'', email:'', phone:'', covers:'', photo:'' });
+  $('#addA').onclick=()=>{ snapshot('adding a person'); DATA.admins.push({ id:uid('person',DATA.admins), name:'New person', title:'', email:'', phone:'', covers:'', photo:'' });
     dirty(); renderPanel(); panePeople(); const last=$('#apane').querySelector('.acc:last-of-type'); if(last){ last.classList.add('open'); if(last.scrollIntoView) last.scrollIntoView({block:'center'}); } };
 }
 function reopenPeople(){
@@ -2544,7 +2670,9 @@ function paneTasks(){
       </div></div>`).join('')}
     <button class="btn" id="addT" style="margin-top:6px">+ Add a task</button>`;
   $('#apane').querySelectorAll('[data-tk]').forEach(el=>{
-    const h=()=>{ DATA.tasks[+el.dataset.i][el.dataset.tk]=el.value; dirty(); }; el.oninput=h; el.onchange=h; });
+    const h=()=>{ const i=+el.dataset.i;
+      markTyping('task'+i+el.dataset.tk, 'that edit to the quick tasks');
+      DATA.tasks[i][el.dataset.tk]=el.value; dirty(); }; el.oninput=h; el.onchange=h; });
   $('#apane').querySelectorAll('[data-pocopen]').forEach(el=>{
     el.onclick=e=>{ e.preventDefault();
       const box=$('#poc'+el.dataset.pocopen);
@@ -2570,7 +2698,10 @@ function paneTasks(){
       });
     };
   });
-  $('#apane').querySelectorAll('[data-tdel]').forEach(el=>{ el.onclick=()=>{ DATA.tasks.splice(+el.dataset.tdel,1); dirty(); paneTasks(); }; });
+  $('#apane').querySelectorAll('[data-tdel]').forEach(el=>{ el.onclick=()=>{
+    const i=+el.dataset.tdel, nm=(DATA.tasks[i]&&DATA.tasks[i].label)||'that task';
+    snapshot('removing '+nm);
+    DATA.tasks.splice(i,1); dirty(); paneTasks(); toastUndo('Removed '+nm+'.'); }; });
   $('#addT').onclick=()=>{ DATA.tasks.push({label:'New request', to:'dept:'+(DATA.depts[0]?DATA.depts[0].id:'')}); dirty(); paneTasks(); };
 }
 
@@ -2742,6 +2873,7 @@ $('#importBtn').onclick=()=>{
     r.onload=()=>{ try{ const d=JSON.parse(r.result);
         const parts=['sites','depts','admins','tasks'].filter(k=>Array.isArray(d[k]));
         if(!parts.length) throw new Error('shape');
+        snapshot('that import');
         DATA=mergeSaved(d, DATA); renderAll(); renderAdmin();
         const named={sites:'sites',depts:'departments',admins:'admin team',tasks:'quick tasks'};
         note('Imported '+parts.map(k=>named[k]).join(', ')+'. Nothing else was touched. Publish to make it live.','ok');
