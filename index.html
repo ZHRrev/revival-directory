@@ -1582,13 +1582,37 @@ const NUMWORDS=['no','One','Two','Three','Four','Five','Six','Seven','Eight','Ni
   'Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen','Twenty'];
 function numWord(n){ return NUMWORDS[n] || String(n); }
 
+/* Everything reaching the app comes through here — the server on boot, and an
+   imported file. A single null in a team array used to take the whole page
+   down, so stray entries are swept out once, here, rather than guarded at
+   every place that later reads them. Nothing real is discarded: only entries
+   that are not objects at all. */
+function tidy(d){
+  const list = v => Array.isArray(v) ? v.filter(x => x && typeof x === 'object') : [];
+  ['sites','depts','admins','tasks'].forEach(k=>{ if(Array.isArray(d[k])) d[k]=list(d[k]); });
+  (d.sites||[]).forEach(s=>{
+    s.team = list(s.team);
+    s.pis  = list(s.pis);
+    s.areas = Array.isArray(s.areas) ? s.areas.filter(x=>typeof x==='string') : [];
+    ['lead','crm','backup'].forEach(k=>{ if(s[k] && typeof s[k]!=='object') s[k]=undefined; });
+  });
+  (d.depts||[]).forEach(x=>{
+    x.team = list(x.team);
+    ['handles','avoid','keywords'].forEach(k=>{
+      if(x[k]!==undefined) x[k] = Array.isArray(x[k]) ? x[k].filter(v=>typeof v==='string') : [];
+    });
+    if(x.head && typeof x.head!=='object') x.head=undefined;
+  });
+  return d;
+}
+
 function mergeSaved(saved, base){
   const b = base || SEED;
   const out = Object.assign({}, b, saved);
   ['sites','depts','admins','tasks'].forEach(k=>{
     if(!Array.isArray(out[k])) out[k] = Array.isArray(b[k]) ? b[k] : SEED[k];
   });
-  return out;
+  return tidy(out);
 }
 
 function renderGate(msg){
@@ -1754,7 +1778,8 @@ function hits(q){
   (DATA.depts||[]).forEach(d=>{
     const task = DATA.tasks.some(t=>t.to==='dept:'+d.id && t.label.toLowerCase().includes(q));
     const hay = [d.name,d.purpose,(d.keywords||[]).join(' '),(d.handles||[]).join(' '),(d.avoid||[]).join(' '),
-                 d.head&&d.head.name,d.head&&d.head.title,(d.team||[]).map(m=>m.name+' '+m.role).join(' ')].join(' ').toLowerCase();
+                 slotNames(d.head).join(' '),d.head&&d.head.title,
+                 (d.team||[]).map(m=>m.name+' '+m.role).join(' ')].join(' ').toLowerCase();
     if(hay.includes(q)||task) out.push({kind:'dept', id:d.id, s: String(d.name).toLowerCase().includes(q)?3:((d.keywords||[]).some(k=>k.includes(q))||task?2:1)});
   });
   (DATA.admins||[]).forEach(a=>{
@@ -1843,6 +1868,21 @@ function slotPeople(o){
 }
 const slotNames = o => slotPeople(o).map(p=>p.name);
 
+/* Everyone named in a leadership slot at this site, lower-cased for matching.
+   Slots can hold several comma-separated names, so expand them all. */
+function leadNames(s){
+  const out=new Set();
+  ['crm','lead','backup'].forEach(k=>slotNames(s[k]).forEach(n=>out.add(String(n).trim().toLowerCase())));
+  return out;
+}
+/* The roster people actually want counted: coordinators and other site staff,
+   with the CRM, site lead and backup taken out. Those three are listed above in
+   their own rows, so counting them again makes the number look wrong. */
+function siteStaff(s){
+  const skip=leadNames(s);
+  return (s.team||[]).filter(m=>m && m.name && !skip.has(String(m.name).trim().toLowerCase()));
+}
+
 function leadRows(s){
   const nm = o => (o && o.name) ? o.name.trim() : '';
   const crm = nm(s.crm), lead = nm(s.lead), back = nm(s.backup);
@@ -1862,7 +1902,7 @@ function leadRows(s){
 function siteCard(s,i,showKind){
   if(!s) return '';
   const a = siteAcc(s);
-  const crcs = (s.team||[]).filter(m=>/crc|clinical research coord/i.test(m.role||''));
+  const crcs = siteStaff(s).filter(m=>/crc|clinical research coord/i.test(m.role||''));
   return `<button class="card" data-open="site:${esc(s.id)}" style="--acc:${a};--accbg:${tint(a)};animation-delay:${i*30}ms">
     <div class="card-top">
       <div style="min-width:0">
@@ -1884,8 +1924,28 @@ function siteCard(s,i,showKind){
       <div class="rrow"><span class="rk">CRCs</span><span class="rv">${crcs.length?crcs.map(c=>esc(c.name)).join(', '):'<span class="none">Not set</span>'}</span></div>
     </div>
     <div class="chain"><span class="bead"></span><span class="arw">→</span><span class="bead hollow"></span>
-      <span class="up">${(s.team||[]).length} on the roster</span></div>
+      <span class="up">${(()=>{const n=siteStaff(s).length;
+        return n ? n+' CRC'+(n===1?'':'s')+' and site staff' : 'No CRCs or site staff listed';})()}</span></div>
   </button>`;
+}
+
+/* A department's people as one list. The person in the `head` field is not
+   necessarily the face of the department — several departments share a lead
+   while someone else does the day-to-day — so nobody is singled out here.
+   Titles carry the hierarchy instead. */
+function deptPeople(d){
+  const out=[];
+  const h=d.head||{};
+  slotPeople(h).forEach(p=>out.push({name:p.name, role:p.title||'Department lead',
+    email:p.email, phone:p.phone}));
+  (d.team||[]).forEach(m=>{ if(m && m.name) out.push(m); });
+  return out;
+}
+/* A role with a title but no name is an open post, not a person. It is worth
+   showing so the gap is visible, but counting it would overstate the team. */
+function deptVacancy(d){
+  const h=d.head||{};
+  return (!slotNames(h).length && h.title) ? h.title : '';
 }
 
 function deptCard(d,i,showKind){
@@ -1895,7 +1955,9 @@ function deptCard(d,i,showKind){
     <div class="card-top">
       <div style="min-width:0">
         <h3 class="role">${esc(d.name)}</h3>
-        <div class="holder">${d.head&&d.head.name?`<b>${esc(d.head.name)}</b>`:'<span class="pill pill-vacant">Lead not set</span>'}${d.head&&d.head.title?`<span style="color:var(--muted-2)">${esc(d.head.title)}</span>`:''}</div>
+        <div class="holder">${(()=>{const n=deptPeople(d).length;
+          return n ? n+' '+(n===1?'person':'people')+' \u00b7 open to see who does what'
+                   : '<span class="pill pill-vacant">Nobody listed yet</span>';})()}</div>
       </div>
       ${showKind?'<span class="pill pill-dept">Department</span>':''}
     </div>
@@ -1971,8 +2033,12 @@ function openSite(id){
   $('#drDept').textContent=s.state;
   $('#drRole').textContent=s.city+(s.hq?' · HQ':'')+(isActive(s)?'':' · Inactive');
   $('#drHolder').innerHTML=(s.areas||[]).join(' · ');
-  const crcs=(s.team||[]).filter(m=>/crc|clinical research coord/i.test(m.role||''));
-  const others=(s.team||[]).filter(m=>!/crc|clinical research coord/i.test(m.role||''));
+  /* Coordinators first, then everyone else, but in one list — splitting them
+     into two blocks made the page read as two separate teams. */
+  const staff=siteStaff(s);
+  const crcs=staff.filter(m=>/crc|clinical research coord/i.test(m.role||''));
+  const others=staff.filter(m=>!/crc|clinical research coord/i.test(m.role||''));
+  const roster=[...crcs,...others];
   $('#drBody').innerHTML=`
     ${s.notes?`<p style="margin:0;font-size:15px;color:#33465F">${esc(s.notes)}</p>`:''}
     <div class="blk"><p class="blk-t">${esc(s.addrLabel || (DATA.config&&DATA.config.addrLabel) || 'Location')}</p>
@@ -1991,9 +2057,9 @@ function openSite(id){
             ppl.map(p=>personRow({name:p.name, role:p.title||label, email:p.email, phone:p.phone})).join('')}</div></div>`;
         }).join('');
       })()}
-    <div class="blk"><p class="blk-t">Coordinators${crcs.length?' · '+crcs.length:''}</p>
-      ${crcs.length?`<div class="plist">${crcs.map(m=>personRow(m)).join('')}</div>`:'<span class="unset">No coordinators listed yet.</span>'}</div>
-    ${others.length?`<div class="blk"><p class="blk-t">Other site staff</p><div class="plist">${others.map(m=>personRow(m)).join('')}</div></div>`:''}`;
+    <div class="blk"><p class="blk-t">CRCs and other site staff${roster.length?' \u00b7 '+roster.length:''}</p>
+      ${roster.length?`<div class="plist">${roster.map(m=>personRow(m)).join('')}</div>`
+        :'<span class="unset">Nobody listed yet beyond the people above.</span>'}</div>`;
   showDrawer(a);
 }
 function openPerson(name){
@@ -2013,8 +2079,10 @@ function openDept(id){
   const d=dept(id); if(!d) return;
   $('#drDept').textContent='Non-Clinical';
   $('#drRole').textContent=d.name;
-  $('#drHolder').innerHTML = d.head&&d.head.name ? `<b>${esc(d.head.name)}</b> · ${esc(d.head.title||'')}`
-    : (d.head&&d.head.title? esc(d.head.title)+' — name not set' : 'Lead not set');
+  /* The header names the department, not a person. Who does what is in the
+     list below, where each person's own title says it. */
+  $('#drHolder').innerHTML = (()=>{ const n=deptPeople(d).length;
+    return n ? esc(n+' '+(n===1?'person':'people')) : 'Nobody listed yet'; })();
   $('#drBody').innerHTML=`
     ${d.purpose?`<p style="margin:0;font-size:15px;color:#33465F">${esc(d.purpose)}</p>`:''}
     <div class="route">
@@ -2027,13 +2095,12 @@ function openDept(id){
     ${(d.avoid||[]).length?`<div class="blk blk-warn"><p class="blk-t">Don't route this here</p>
       <ul>${d.avoid.map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
     ${d.authority?`<div class="blk"><p class="blk-t">Authority</p><p style="margin:0;font-size:14px">${esc(d.authority)}</p></div>`:''}
-    <div class="blk"><p class="blk-t">Who's in it</p>
-      <div class="plist">
-        ${d.head&&(d.head.name||d.head.title)?personRow({name:d.head.name||'Not set',role:d.head.title,email:d.head.email,phone:d.head.phone}):''}
-        ${(d.team||[]).map(m=>personRow(m)).join('')}
-      </div>
-      ${!(d.head&&d.head.name)&&!(d.team||[]).length?'<span class="unset">No names saved yet. Add them in Manage.</span>':''}
-    </div>`;
+    ${(()=>{ const ppl=deptPeople(d), vac=deptVacancy(d);
+      return `<div class="blk"><p class="blk-t">Who's in it${ppl.length?' \u00b7 '+ppl.length:''}</p>
+        ${ppl.length ? `<div class="plist">${ppl.map(m=>personRow(m)).join('')}</div>` : ''}
+        ${vac ? `<p class="unset" style="margin:${ppl.length?'12px 0 0':'0'}">${esc(vac)} \u2014 post not filled.</p>` : ''}
+        ${!ppl.length && !vac ? '<span class="unset">No names saved yet. Add them in Manage.</span>' : ''}
+      </div>`; })()}`;
   showDrawer(d.accent);
 }
 function openAdmin(id){
@@ -2339,9 +2406,9 @@ function applyJump(pane, root){
 function paneGaps(){
   const G=[];
   (DATA.sites||[]).forEach((s,i)=>{
-    const crcs=(s.team||[]).filter(m=>/crc|clinical research coord/i.test(m.role||'')&&m.name);
+    const crcs=siteStaff(s).filter(m=>/crc|clinical research coord/i.test(m.role||''));
     if(!slotNames(s.lead).length) G.push({pane:'sites',i,label:s.city+' \u2014 no site lead',w:3});
-    if(!crcs.length)           G.push({pane:'sites',i,label:s.city+' \u2014 no coordinators listed',w:2});
+    if(!crcs.length)           G.push({pane:'sites',i,label:s.city+' \u2014 no coordinators beyond the leads',w:2});
     if(!s.phone)               G.push({pane:'sites',i,label:s.city+' \u2014 no phone number',w:1});
     if(!(s.pis||[]).length)    G.push({pane:'sites',i,label:s.city+' \u2014 no principal investigator',w:2});
   });
@@ -2390,7 +2457,7 @@ function paneSites(){
         <button class="acc-h" data-toggle="${i}">
           <span style="width:9px;height:9px;border-radius:50%;background:${siteAcc(s)};flex:none"></span>
           <span style="min-width:0"><span class="role" style="display:block">${esc(s.city)}</span>
-          <span class="holder">${esc(s.state)} · ${(s.team||[]).length} on roster · ${s.lead&&s.lead.name?esc(s.lead.name):'<em style="color:var(--muted-2)">no lead</em>'}${isActive(s)?'':' · inactive'}</span></span>
+          <span class="holder">${esc(s.state)} · ${siteStaff(s).length} CRCs and site staff · ${s.lead&&s.lead.name?esc(s.lead.name):'<em style="color:var(--muted-2)">no lead</em>'}${isActive(s)?'':' · inactive'}</span></span>
           ${ordCtl('sites', i, (DATA.sites||[]).length)}
           <span class="caret">▾</span></button>
         <div class="acc-b"><div class="fgrid">
@@ -2494,7 +2561,7 @@ function paneDepts(){
         <button class="acc-h" data-toggle="${i}">
           <span style="width:9px;height:9px;border-radius:50%;background:${esc(d.accent)};flex:none"></span>
           <span style="min-width:0"><span class="role" style="display:block">${esc(d.name)}</span>
-          <span class="holder">${d.head&&d.head.name?esc(d.head.name):'<em style="color:var(--muted-2)">no lead</em>'} · ${(d.team||[]).length+((d.head&&d.head.name)?1:0)} people</span></span>
+          <span class="holder">${d.head&&d.head.name?esc(d.head.name):'<em style="color:var(--muted-2)">no lead</em>'} · ${deptPeople(d).length} people</span></span>
           ${ordCtl('depts', i, (DATA.depts||[]).length)}
           <span class="caret">▾</span></button>
         <div class="acc-b"><div class="fgrid">
