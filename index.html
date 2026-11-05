@@ -216,8 +216,8 @@ a{color:var(--navy)}
 .dr-holder b{color:#fff;font-weight:600}
 .dr-body{overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:18px}
 /* A column flex child whose overflow is hidden gets min-height:auto resolved to
-   zero, so a tall drawer squashed the route strip until its text was sliced in
-   half. Nothing in here should ever shrink — the body scrolls instead. */
+   zero, so a tall drawer used to squash its own blocks until the text was
+   sliced in half. Nothing in here should ever shrink — the body scrolls. */
 .dr-body>*{flex:0 0 auto}
 .blk{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 17px}
 .blk-t{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;font-weight:500;color:var(--muted-2);margin:0 0 11px}
@@ -227,12 +227,6 @@ a{color:var(--navy)}
 .blk-warn{background:var(--warn-bg);border-color:#F2DCC9}
 .blk-warn .blk-t{color:var(--warn)}
 .blk-warn ul li::before{background:var(--warn);border-radius:1px;width:6px;height:1.5px;top:11px}
-.route{display:flex;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.route-step{flex:1;padding:13px 14px;min-width:0}
-.route-step + .route-step{border-left:1px solid var(--line-soft)}
-.route-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:500;color:var(--muted-2)}
-.route-v{font-size:13.5px;font-weight:500;margin-top:5px;line-height:1.3}
-.route-step.here{background:linear-gradient(180deg,var(--accbg,#EAF7FA),#fff)}
 .plist{display:flex;flex-direction:column;gap:2px}
 .pitem{display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--line-soft)}
 .pitem:last-child{border-bottom:0}
@@ -367,8 +361,6 @@ a{color:var(--navy)}
   .brand-mark{height:38px}
   .brand-name{font-size:12.5px;letter-spacing:.03em}
   .brand-sub{display:none}
-  .route{flex-direction:column}
-  .route-step + .route-step{border-left:0;border-top:1px solid var(--line-soft)}
   .modal{padding:0}
   .sheet{border-radius:0;min-height:100vh}
   .sheet-body{max-height:none}
@@ -2276,25 +2268,24 @@ function openDept(id){
      list below, where each person's own title says it. */
   $('#drHolder').innerHTML = (()=>{ const n=deptPeople(d).length;
     return n ? esc(n+' '+(n===1?'person':'people')) : 'Nobody listed yet'; })();
+  /* Every section earns its place: nothing renders unless it has content.
+     "Owned by" is gone — the drawer title already names the department. */
+  const handles = (d.handles||[]).filter(x=>String(x).trim());
+  const avoid   = (d.avoid||[]).filter(x=>String(x).trim());
+  const ppl     = deptPeople(d), vac = deptVacancy(d);
   $('#drBody').innerHTML=`
     ${d.purpose?`<p style="margin:0;font-size:15px;color:#33465F">${esc(d.purpose)}</p>`:''}
-    <div class="route">
-      <div class="route-step here"><div class="route-k">Owned by</div><div class="route-v">${esc(d.name)}</div></div>
-      <div class="route-step"><div class="route-k">Escalates to</div><div class="route-v">${d.escalate?esc(d.escalate):'—'}</div></div>
-    </div>
-    <div class="blk"><p class="blk-t">Send this to them</p>
-      <ul>${(d.handles||[]).map(h=>`<li>${esc(h)}</li>`).join('')||'<li class="unset">Nothing listed yet.</li>'}</ul></div>
+    ${handles.length?`<div class="blk"><p class="blk-t">Send this to them</p>
+      <ul>${handles.map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
     ${d.authority?`<div class="blk"><p class="blk-t">Authority</p><p style="margin:0;font-size:14px">${esc(d.authority)}</p></div>`:''}
-    ${/* Only shown where it earns its place — most departments do not need it. */
-      (d.avoid||[]).filter(x=>String(x).trim()).length?`<div class="blk blk-warn"><p class="blk-t">Don't route this here</p>
-      <ul>${d.avoid.filter(x=>String(x).trim()).map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
+    ${d.escalate?`<div class="blk"><p class="blk-t">Escalates to</p><p style="margin:0;font-size:14px">${esc(d.escalate)}</p></div>`:''}
+    ${avoid.length?`<div class="blk blk-warn"><p class="blk-t">Don't route this here</p>
+      <ul>${avoid.map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
     ${linkBlock(d)}
-    ${(()=>{ const ppl=deptPeople(d), vac=deptVacancy(d);
-      return `<div class="blk"><p class="blk-t">Who's in it${ppl.length?' \u00b7 '+ppl.length:''}</p>
-        ${ppl.length ? `<div class="plist">${ppl.map(m=>personRow(m)).join('')}</div>` : ''}
-        ${vac ? `<p class="unset" style="margin:${ppl.length?'12px 0 0':'0'}">${esc(vac)} \u2014 post not filled.</p>` : ''}
-        ${!ppl.length && !vac ? '<span class="unset">No names saved yet. Add them in Manage.</span>' : ''}
-      </div>`; })()}`;
+    ${(ppl.length||vac)?`<div class="blk"><p class="blk-t">Who's in it${ppl.length?' \u00b7 '+ppl.length:''}</p>
+      ${ppl.length?`<div class="plist">${ppl.map(m=>personRow(m)).join('')}</div>`:''}
+      ${vac?`<p class="unset" style="margin:${ppl.length?'12px 0 0':'0'}">${esc(vac)} \u2014 post not filled.</p>`:''}
+    </div>`:''}`;
   showDrawer(d.accent);
 }
 function openAdmin(id){
