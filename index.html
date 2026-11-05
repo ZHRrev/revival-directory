@@ -1806,13 +1806,41 @@ function renderChips(){
 
 /* Who to try if the named person is away. Defaults to their own team, which
    is right most of the time; a typed fallback overrides it. */
+/* Does this name a team rather than a person? Checked against the departments
+   and sites you actually have, so a typed team reads like one. */
+function isTeamName(v){
+  const k=String(v||'').trim().toLowerCase();
+  if(!k) return false;
+  return (DATA.depts||[]).some(d=>String(d.name||'').trim().toLowerCase()===k)
+      || (DATA.sites||[]).some(x=>String(x.city||'').trim().toLowerCase()===k);
+}
 function taskFallback(t){
   const typed=(t.fallback||'').trim();
-  if(typed) return typed;
-  if(!t.to || !t.to.startsWith('person:')) return '';
+  if(typed){
+    /* A name you typed is a person unless it matches a team you have. */
+    return {name:typed, team: !findPerson(typed) && isTeamName(typed)};
+  }
+  if(!t.to || !t.to.startsWith('person:')) return null;
   const p=findPerson(t.to.slice(7));
   /* Trimmed: a stray space in a team name would otherwise print as "Finance ." */
-  return p && p.where ? String(p.where).trim() : '';
+  return (p && p.where) ? {name:String(p.where).trim(), team:true} : null;
+}
+/* "the Procurement team" for a team, bare "Mazhar Jaffry" for a person, and
+   never "the Admin team team" for a name that already ends in the word. */
+function teamPhrase(name, isTeam, bold){
+  const nm = bold ? `<b>${esc(name)}</b>` : esc(name);
+  if(!isTeam) return nm;
+  return /\bteam$/i.test(name) ? 'the '+nm : 'the '+nm+' team';
+}
+function fallbackPhrase(f){
+  return (!f || !f.name) ? '' : teamPhrase(f.name, f.team, true);
+}
+/* The owner side of the sentence follows the same rule, so a department
+   reads "If the Marketing & Recruitment team is not available..." */
+function ownerPhrase(ref){
+  const r=resolve(ref); if(!r) return '';
+  const isTeam = r.kind==='dept' || r.kind==='site';
+  return teamPhrase(String(r.label).trim(), isTeam, false);
 }
 
 /* Opening a quick task. The question goes at the top whatever the answer
@@ -1850,7 +1878,7 @@ function openTask(i){
 
   const fb=taskFallback(t);
   if(fb && routes) body.insertAdjacentHTML('beforeend',
-    `<p class="fallback">If ${esc(String(resolve(t.to).label).trim())} is not available, reach out to <b>${esc(fb)}</b>.</p>`);
+    `<p class="fallback">If ${ownerPhrase(t.to)} is not available, reach out to ${fallbackPhrase(fb)}.</p>`);
   body.scrollTop=0;
 }
 
@@ -2913,7 +2941,7 @@ function paneTasks(){
   $('#apane').innerHTML=`<p class="sec-note" style="margin:0 0 14px">Write these the way someone would say the problem out loud, not the way the org chart says it.</p>
     ${(DATA.tasks||[]).map((t,i)=>{
       const person = (t.to||'').startsWith('person:');
-      const auto = person ? (findPerson(t.to.slice(7))||{}).where || '' : '';
+      const auto = person ? String((findPerson(t.to.slice(7))||{}).where||'').trim() : '';
       const extras = (t.answer||'').trim() || (t.link||'').trim() || (t.fallback||'').trim();
       return `<div class="tasked">
       <input data-tk="label" data-i="${i}" value="${esc(t.label)}" placeholder="The question, the way someone would ask it">
@@ -2931,7 +2959,10 @@ function paneTasks(){
         <div class="f full"><label>Link <span class="hint-i">a bare URL works; <b>Open the portal | https://...</b> names the button</span></label>
           <input data-tk="link" data-i="${i}" value="${esc(t.link||'')}" placeholder="Open the employee portal | https://..."></div>
         <div class="f full"><label>If that person is away, reach out to
-          <span class="hint-i">${person ? (auto?'blank uses their team: '+esc(auto):'blank shows nothing \u2014 no team recorded for them') : 'only used when the owner is one named person'}</span></label>
+          <span class="hint-i">${person
+            ? (auto ? 'blank reads \u201c'+esc(/\bteam$/i.test(auto)?'the '+auto:'the '+auto+' team')+'\u201d \u2014 type a person\u2019s name to use them instead'
+                    : 'blank shows nothing \u2014 no team recorded for them')
+            : 'who to try if the owner above cannot help'}</span></label>
           <input data-tk="fallback" data-i="${i}" value="${esc(t.fallback||'')}" placeholder="${person&&auto?esc(auto):'Anyone you like \u2014 a person or a team'}"></div>
       </div></div>`;}).join('')}
     <button class="btn" id="addT" style="margin-top:6px">+ Add a task</button>`;
