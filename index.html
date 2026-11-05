@@ -299,6 +299,14 @@ a{color:var(--navy)}
 .fallback{margin:16px 0 0;font-size:13px;line-height:1.55;color:var(--muted);
   border-top:1px dashed var(--line);padding-top:13px}
 .fallback b{color:var(--ink);font-weight:600}
+/* A team name you can follow. Underlined rather than button-shaped, so it
+   reads as part of the sentence it sits in. */
+.golink{font:inherit;color:var(--navy);background:none;border:0;padding:0;cursor:pointer;
+  font-weight:600;text-align:left;display:inline-flex;align-items:center;gap:5px;
+  border-bottom:1px solid var(--line);transition:color .14s,border-color .14s}
+.golink:hover{color:var(--cyan);border-bottom-color:var(--cyan)}
+.golink:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:3px}
+.golink span{color:var(--cyan);font-weight:400}
 .linkrow{display:flex;flex-wrap:wrap;gap:8px}
 .linkbtn{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-size:13.5px;
   font-weight:600;color:var(--navy);background:var(--card);border:1px solid var(--line);
@@ -1771,14 +1779,18 @@ function renderStamp(){
 /* Everyone named anywhere in the directory, de-duplicated by name. */
 function allPeople(){
   const out=new Map();
-  const add=(p,where)=>{
+  const add=(p,where,ref)=>{
     const n=(p&&p.name||'').trim(); if(!n) return;
-    if(!out.has(n)) out.set(n,{name:n, role:(p.role||p.title||''), email:p.email||'', phone:p.phone||'', where});
+    if(!out.has(n)) out.set(n,{name:n, role:(p.role||p.title||''), email:p.email||'',
+      phone:p.phone||'', where, whereRef:ref||''});
   };
-  (DATA.sites||[]).forEach(s=>{ add(s.lead,s.city); add(s.crm,s.city); add(s.backup,s.city);
-    (s.team||[]).forEach(m=>add(m,s.city)); });
-  (DATA.depts||[]).forEach(d=>{ add(d.head,d.name); (d.team||[]).forEach(m=>add(m,d.name)); });
-  (DATA.admins||[]).forEach(a=>add({name:a.name, role:a.title, email:a.email, phone:a.phone},'Admin team'));
+  (DATA.sites||[]).forEach(s=>{ const r='site:'+s.id;
+    add(s.lead,s.city,r); add(s.crm,s.city,r); add(s.backup,s.city,r);
+    (s.team||[]).forEach(m=>add(m,s.city,r)); });
+  (DATA.depts||[]).forEach(d=>{ const r='dept:'+d.id;
+    add(d.head,d.name,r); (d.team||[]).forEach(m=>add(m,d.name,r)); });
+  (DATA.admins||[]).forEach(a=>add({name:a.name, role:a.title, email:a.email, phone:a.phone},
+    'Admin team','admin:'+a.id));
   return [...out.values()];
 }
 function findPerson(n){ return allPeople().find(p=>p.name===n); }
@@ -2160,6 +2172,9 @@ function openRef(ref){
   if(kind==='person') return openPerson(id);
 }
 function showDrawer(a){
+  /* Following a team link while scrolled down used to land you half way into
+     the new page. Every opener comes through here, so reset it once. */
+  const b=$('#drBody'); if(b) b.scrollTop=0;
   $('#drawer').style.setProperty('--acc',a);
   $('#drawer').style.setProperty('--accbg',tint(a));
   $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); $('#drClose').focus();
@@ -2207,7 +2222,12 @@ function openPerson(name){
   $('#drBody').innerHTML = `
     <div class="blk"><p class="blk-t">Contact</p>${personRow(p)}</div>
     <div class="blk"><p class="blk-t">Where they sit</p>
-      <div class="crow"><span class="ck">Team</span><span>${esc(p.where||'—')}</span></div>
+      <div class="crow"><span class="ck">Team</span>${
+        p.where
+          ? (p.whereRef
+              ? `<button class="golink" data-open="${esc(p.whereRef)}">${esc(p.where)}<span aria-hidden="true">\u203A</span></button>`
+              : `<span>${esc(p.where)}</span>`)
+          : '<span>\u2014</span>'}</div>
       ${p.role?`<div class="crow"><span class="ck">Role</span><span>${esc(p.role)}</span></div>`:''}
     </div>`;
   showDrawer('#2E7D8F');
