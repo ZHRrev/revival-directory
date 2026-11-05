@@ -1798,7 +1798,8 @@ function renderChips(){
        written answer — some questions need no team at all. */
     if(!t.label) return '';
     const routes = t.to && resolve(t.to);
-    if(!routes && !(t.answer||'').trim()) return '';
+    /* A link on its own is a complete answer too, so it earns a chip. */
+    if(!routes && !(t.answer||'').trim() && !(t.link||'').trim()) return '';
     return `<button class="chip" data-task="${i}">${esc(t.label)}</button>`;
   }).join('');
 }
@@ -1835,10 +1836,15 @@ function openTask(i){
   /* The question itself, so the drawer answers something visible. */
   bits.push(`<div class="qask"><span class="qask-k">You need help with</span>
     <p class="qask-q">${esc(t.label)}</p></div>`);
-  if(answer){
-    bits.push(`<div class="blk blk-answer"><p class="blk-t">The answer</p>
-      <p class="ans">${esc(answer)}</p>
-      ${link?`<a class="btn btn-solid btn-sm ans-link" href="${esc(link)}" target="_blank" rel="noopener">Open the link \u2197</a>`:''}</div>`);
+  /* The link stands on its own. It used to be nested inside the answer, so a
+     task with a link and no written answer showed nothing at all. */
+  const lk = link ? parseLinks(link)[0] : null;
+  if(answer || lk){
+    bits.push(`<div class="blk blk-answer">
+      <p class="blk-t">${answer?'The answer':'Where to go'}</p>
+      ${answer?`<p class="ans">${esc(answer)}</p>`:''}
+      ${lk?`<a class="btn btn-solid btn-sm ans-link" href="${esc(lk.url)}" target="_blank" rel="noopener">${
+        esc(lk.label||'Open the link')} \u2197</a>`:''}</div>`);
   }
   body.insertAdjacentHTML('afterbegin', bits.join(''));
 
@@ -2186,14 +2192,25 @@ function parseLinks(v){
   return lines(v).map(l=>{
     const i=l.indexOf('|');
     const label = i>-1 ? l.slice(0,i).trim() : '';
-    const url   = (i>-1 ? l.slice(i+1) : l).trim();
+    const url   = tidyUrl(i>-1 ? l.slice(i+1) : l);
     return {label, url};
   }).filter(l=>l.url);
 }
+/* A pasted address is rarely perfect. Accept a bare domain by adding https://,
+   accept an in-site path, and refuse anything that is plainly not a link rather
+   than rendering a button that goes nowhere. */
+function tidyUrl(v){
+  const u=String(v||'').trim();
+  if(!u) return '';
+  if(/^(https?:|mailto:|tel:)/i.test(u)) return u;
+  if(u.startsWith('/')) return u;
+  if(/^[\w.-]+\.[a-z]{2,}(\/|\?|#|$)/i.test(u) && !/\s/.test(u)) return 'https://'+u;
+  return '';
+}
 function cleanLinks(x){
   return (Array.isArray(x&&x.links) ? x.links : [])
-    .filter(l => l && String(l.url||'').trim())
-    .map(l => ({label:String(l.label||'').trim() || 'Open link', url:String(l.url).trim()}));
+    .map(l => ({label:String((l&&l.label)||'').trim() || 'Open link', url:tidyUrl(l&&l.url)}))
+    .filter(l => l.url);
 }
 function linkBlock(x){
   const L=cleanLinks(x);
@@ -2911,8 +2928,8 @@ function paneTasks(){
       <div class="pocbox" id="tmore${i}" ${extras?'':'hidden'}>
         <div class="f full"><label>Written answer <span class="hint-i">shown instead of, or above, the owner</span></label>
           <textarea data-tk="answer" data-i="${i}" rows="3" placeholder="e.g. Go to the employee portal and submit the training form.">${esc(t.answer||'')}</textarea></div>
-        <div class="f full"><label>Link <span class="hint-i">the button only appears when this is filled</span></label>
-          <input data-tk="link" data-i="${i}" value="${esc(t.link||'')}" placeholder="https://..."></div>
+        <div class="f full"><label>Link <span class="hint-i">a bare URL works; <b>Open the portal | https://...</b> names the button</span></label>
+          <input data-tk="link" data-i="${i}" value="${esc(t.link||'')}" placeholder="Open the employee portal | https://..."></div>
         <div class="f full"><label>If that person is away, reach out to
           <span class="hint-i">${person ? (auto?'blank uses their team: '+esc(auto):'blank shows nothing \u2014 no team recorded for them') : 'only used when the owner is one named person'}</span></label>
           <input data-tk="fallback" data-i="${i}" value="${esc(t.fallback||'')}" placeholder="${person&&auto?esc(auto):'Anyone you like \u2014 a person or a team'}"></div>
