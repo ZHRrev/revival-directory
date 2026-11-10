@@ -295,6 +295,8 @@ a{color:var(--navy)}
 .fallback b{color:var(--ink);font-weight:600}
 /* A team name you can follow. Underlined rather than button-shaped, so it
    reads as part of the sentence it sits in. */
+.ownlist{display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+.ownplain{font-size:14px;font-weight:400;color:#33465F;line-height:1.4}
 .golink{font:inherit;color:var(--navy);background:none;border:0;padding:0;cursor:pointer;
   font-weight:600;text-align:left;display:inline-flex;align-items:center;gap:5px;
   border-bottom:1px solid var(--line);transition:color .14s,border-color .14s}
@@ -311,8 +313,11 @@ a{color:var(--navy)}
 .banner-warn{background:var(--warn-bg);border-color:#F2DCC9;color:#6D3512}
 .banner-info{background:#EDF6FA;border-color:#CCE5EE;color:#144B5C}
 .pocbox{flex-basis:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg-soft)}
+.ownhint{display:block;font-size:11.5px;color:var(--cyan);margin-top:6px;min-height:16px}
 .hint-i{display:block;font-family:var(--body);font-size:11px;letter-spacing:0;text-transform:none;
   font-weight:400;color:var(--muted-2);margin-top:2px}
+.apane-f textarea,.f.full textarea{width:100%;padding:9px 11px;border-radius:9px;
+  border:1px solid var(--line);font:inherit;font-size:14px;resize:vertical;line-height:1.5}
 .tasked textarea{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);
   font:inherit;font-size:14px;resize:vertical;line-height:1.5}
 .pocq{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);font:inherit;font-size:14px}
@@ -1649,6 +1654,9 @@ function tidy(d){
     });
     if(x.head && typeof x.head!=='object') x.head=undefined;
   });
+  (d.admins||[]).forEach(a=>{
+    if(a.owns!==undefined) a.owns = Array.isArray(a.owns) ? a.owns.filter(v=>typeof v==='string') : [];
+  });
   return d;
 }
 
@@ -1812,6 +1820,28 @@ function renderChips(){
    is right most of the time; a typed fallback overrides it. */
 /* Does this name a team rather than a person? Checked against the departments
    and sites you actually have, so a typed team reads like one. */
+/* The page for a team of this name, if the directory has one. Used to turn a
+   typed responsibility into a link without making you pick from a list. */
+/* a box that grows to whatever is typed in it, so nothing is ever clipped */
+function grow(el){
+  if(!el) return;
+  try{ el.style.height='auto';
+       const h=el.scrollHeight;
+       if(h) el.style.height=Math.max(h, 56)+'px'; }catch(e){}
+}
+function teamRef(v){
+  const k=String(v||'').trim().toLowerCase();
+  if(!k) return '';
+  const d=(DATA.depts||[]).find(x=>String(x.name||'').trim().toLowerCase()===k);
+  if(d) return 'dept:'+d.id;
+  const s=(DATA.sites||[]).find(x=>String(x.city||'').trim().toLowerCase()===k);
+  return s ? 'site:'+s.id : '';
+}
+function ownsList(a){
+  return (Array.isArray(a&&a.owns) ? a.owns : [])
+    .map(x=>String(x||'').trim()).filter(Boolean)
+    .map(name=>({name, ref:teamRef(name)}));
+}
 function isTeamName(v){
   const k=String(v||'').trim().toLowerCase();
   if(!k) return false;
@@ -1916,7 +1946,7 @@ function hits(q){
     if(hay.includes(q)||task) out.push({kind:'dept', id:d.id, s: String(d.name).toLowerCase().includes(q)?3:((d.keywords||[]).some(k=>k.includes(q))||task?2:1)});
   });
   (DATA.admins||[]).forEach(a=>{
-    const hay=[a.name,a.title,a.covers].join(' ').toLowerCase();
+    const hay=[a.name,a.title,a.covers,(Array.isArray(a.owns)?a.owns:[]).join(' ')].join(' ').toLowerCase();
     if(hay.includes(q)) out.push({kind:'admin', id:a.id, s: String(a.name).toLowerCase().includes(q)?3:1});
   });
   return out.sort((x,y)=>y.s-x.s);
@@ -2111,7 +2141,10 @@ function adminCard(a,i){
     <div class="ava"><div class="ava-in">${avatarInner(a)}</div></div>
     <div class="pname">${esc(a.name)}</div>
     <div class="ptitle">${a.title?esc(a.title):'Title not set'}</div>
-    ${a.covers?`<div class="pcovers">${esc(a.covers.length>72?a.covers.slice(0,70).trim()+'…':a.covers)}</div>`:''}
+    ${(()=>{ const clip=s=>esc(s.length>72?s.slice(0,70).trim()+'…':s);
+      if(a.covers) return `<div class="pcovers">${clip(a.covers)}</div>`;
+      const L=ownsList(a);
+      return L.length ? `<div class="pcovers">${clip(L.map(o=>o.name).join(' · '))}</div>` : ''; })()}
     <div class="pdots">${m}${p}</div>
   </div>`;
 }
@@ -2122,7 +2155,9 @@ function adminCardLight(a,i){
       <h3 class="role">${esc(a.name)}</h3>
       <div class="holder">${a.title?esc(a.title):'<span class="pill pill-vacant">Title not set</span>'}</div>
     </div><span class="pill pill-dept">Admin</span></div>
-    ${a.covers?`<ul class="owns"><li>${esc(a.covers)}</li></ul>`:''}
+    ${(()=>{ if(a.covers) return `<ul class="owns"><li>${esc(a.covers)}</li></ul>`;
+      const L=ownsList(a);
+      return L.length ? `<ul class="owns">${L.slice(0,4).map(o=>`<li>${esc(o.name)}</li>`).join('')}</ul>` : ''; })()}
   </button>`;
 }
 
@@ -2297,7 +2332,13 @@ function openAdmin(id){
     <div style="display:flex;justify-content:center;padding:4px 0 2px">
       <div class="ava" style="width:112px;height:112px"><div class="ava-in" style="border-color:var(--paper)">${avatarInner(a)}</div></div>
     </div>
-    ${a.covers?`<div class="blk"><p class="blk-t">What they cover</p><p style="margin:0;font-size:14px;line-height:1.5">${esc(a.covers)}</p></div>`:''}
+    ${a.covers?`<div class="blk"><p class="blk-t">About</p><p style="margin:0;font-size:14px;line-height:1.5">${esc(a.covers)}</p></div>`:''}
+    ${(()=>{ const L=ownsList(a); if(!L.length) return '';
+      return `<div class="blk"><p class="blk-t">Responsible for</p><div class="ownlist">${
+        L.map(o=>o.ref
+          ? `<button class="golink" data-open="${esc(o.ref)}">${esc(o.name)}<span aria-hidden="true">\u203A</span></button>`
+          : `<span class="ownplain">${esc(o.name)}</span>`).join('')
+      }</div></div>`; })()}
     <div class="blk"><p class="blk-t">Contact</p>
       ${a.email?`<div class="crow"><span class="ck">Email</span><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></div>`:''}
       ${a.phone?`<div class="crow"><span class="ck">Phone</span><a href="tel:${esc(a.phone.replace(/[^\d+]/g,''))}">${esc(a.phone)}</a></div>`:''}
@@ -2704,7 +2745,10 @@ function paneSites(){
       </div>`).join('')}
     <button class="btn" id="addS" style="margin-top:10px">+ Add a site</button>`;
 
-  p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>el.closest('.acc').classList.toggle('open'));
+  p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>{
+    const acc=el.closest('.acc'); acc.classList.toggle('open');
+    if(acc.classList.contains('open')) acc.querySelectorAll('textarea').forEach(grow);
+  });
   applyJump('sites', p);
   wireOrder(p);
   p.querySelectorAll('[data-sk]').forEach(el=>{
@@ -2805,7 +2849,10 @@ function paneDepts(){
     dirty(); paneDepts();
     toastUndo('Cleared it from '+hit+' departments.');
   };
-  p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>el.closest('.acc').classList.toggle('open'));
+  p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>{
+    const acc=el.closest('.acc'); acc.classList.toggle('open');
+    if(acc.classList.contains('open')) acc.querySelectorAll('textarea').forEach(grow);
+  });
   applyJump('depts', p);
   wireOrder(p);
   p.querySelectorAll('[data-dk]').forEach(el=>{
@@ -2877,7 +2924,15 @@ function panePeople(){
             <div class="f"><label>Title</label><input data-ak="title" data-i="${i}" value="${esc(a.title||'')}"></div>
             <div class="f"><label>Email</label><input data-ak="email" data-i="${i}" value="${esc(a.email||'')}"></div>
             <div class="f"><label>Phone</label><input data-ak="phone" data-i="${i}" value="${esc(a.phone||'')}"></div>
-            <div class="f full"><label>What they cover</label><input data-ak="covers" data-i="${i}" value="${esc(a.covers||'')}" placeholder="The thing people should come to them for"></div>
+            <div class="f full"><label>Short description <span class="hint-i">a line or two about them, shown under their photo</span></label>
+              <textarea data-ak="covers" data-i="${i}" rows="2" placeholder="e.g. Oversees clinical operations across all Michigan sites and chairs the quality committee.">${esc(a.covers||'')}</textarea></div>
+            <div class="f full"><label>Responsible for <span class="hint-i">one per line \u2014 a team name links to its page, anything else shows as plain text</span></label>
+              <textarea data-ak="owns" data-i="${i}" rows="3" placeholder="Feasibility&#10;Quality &amp; Compliance&#10;Payroll and benefits">${esc((Array.isArray(a.owns)?a.owns:[]).join('\n'))}</textarea>
+              <span class="ownhint" data-ownhint="${i}">${(()=>{ const L=ownsList(a);
+                if(!L.length) return '';
+                const yes=L.filter(o=>o.ref).length;
+                return yes ? yes+' of '+L.length+' will link to a page in the directory'
+                           : 'none of these match a team here \u2014 they will show as plain text';})()}</span></div>
             <div class="f full"><label>Photo URL (instead of uploading)</label><input data-ak="photo" data-i="${i}" value="${a.photo&&a.photo.startsWith('data:')?'':esc(a.photo||'')}" placeholder="https://…"></div>
           </div>
           <div class="rowend"><button class="btn btn-danger btn-sm" data-adel="${i}">Remove from the team</button></div>
@@ -2885,14 +2940,29 @@ function panePeople(){
       </div>`).join('')}
     <button class="btn" id="addA" style="margin-top:10px">+ Add someone</button>`;
 
-  p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>el.closest('.acc').classList.toggle('open'));
+  p.querySelectorAll('[data-toggle]').forEach(el=>el.onclick=()=>{
+    const acc=el.closest('.acc'); acc.classList.toggle('open');
+    if(acc.classList.contains('open')) acc.querySelectorAll('textarea').forEach(grow);
+  });
   applyJump('people', p);
   wireOrder(p);
   $('#abl').oninput=e=>{ DATA.adminBlurb=e.target.value; dirty(); };
   p.querySelectorAll('[data-ak]').forEach(el=>{
-    el.oninput=()=>{ const i=+el.dataset.i;
-      markTyping('adm'+i+el.dataset.ak, 'that edit to '+(DATA.admins[i].name||'the admin team'));
-      DATA.admins[i][el.dataset.ak]=el.value; dirty(); };
+    if(el.tagName==='TEXTAREA') grow(el);
+    el.oninput=()=>{ const i=+el.dataset.i, k=el.dataset.ak;
+      if(el.tagName==='TEXTAREA') grow(el);
+      markTyping('adm'+i+k, 'that edit to '+(DATA.admins[i].name||'the admin team'));
+      if(k==='owns') DATA.admins[i].owns=lines(el.value);
+      else DATA.admins[i][k]=el.value;
+      dirty();
+      /* say straight away which lines will become links */
+      if(k==='owns'){ const h=$('#apane').querySelector(`[data-ownhint="${i}"]`);
+        if(h){ const L=ownsList(DATA.admins[i]);
+          const yes=L.filter(o=>o.ref).length;
+          h.textContent = !L.length ? ''
+            : yes ? yes+' of '+L.length+' will link to a page in the directory'
+                  : 'none of these match a team here \u2014 they will show as plain text'; } }
+    };
   });
   p.querySelectorAll('[data-up]').forEach(el=>{
     el.onclick=()=>{ snapshot('that photo change'); const i=+el.dataset.up, inp=document.createElement('input');
