@@ -296,6 +296,51 @@ a{color:var(--navy)}
 /* A team name you can follow. Underlined rather than button-shaped, so it
    reads as part of the sentence it sits in. */
 .ownlist{display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+/* ── Paychex sync ──────────────────────────────────────────────────────── */
+.btn:disabled,.btn[disabled]{opacity:.42;cursor:not-allowed;box-shadow:none}
+select:disabled{opacity:.5;cursor:not-allowed;background:#F4F7FB}
+#manageBtn{position:relative}
+.mbadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;
+  padding:0 5px;margin-left:7px;border-radius:9px;background:#C8102E;color:#fff;
+  font-family:var(--body);font-size:11px;font-weight:600;line-height:1;letter-spacing:0;vertical-align:middle}
+.sync-top{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid #E6ECF4;margin-bottom:18px}
+.sync-top .btn{flex:0 0 auto}
+.sync-h3{font-family:var(--display);font-weight:500;font-size:16px;color:var(--ink);margin:26px 0 4px}
+.sync-count{font-size:13px;font-weight:500;color:#33465F;margin:0 0 12px}
+.sync-box{border:1px solid #E6ECF4;border-radius:14px;padding:16px;margin-bottom:18px;background:#FBFCFE}
+.sync-bt{font-family:var(--display);font-weight:500;font-size:15px;margin:0 0 2px;color:var(--ink)}
+.sync-list{display:flex;flex-direction:column;gap:12px}
+.sync-c{border:1px solid #E6ECF4;border-radius:14px;padding:15px 16px;background:#fff}
+.sync-in{border-left:3px solid #1A7F8E}
+.sync-out{border-left:3px solid #C8102E}
+.sync-h{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.sync-n{font-family:var(--display);font-weight:600;font-size:15px;margin:0;color:var(--ink)}
+.sync-s{font-size:13px;color:#5A6B82;margin:2px 0 0}
+.sync-tag{flex:0 0 auto;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px}
+.sync-tag-in{background:#E6F4F6;color:#116370}
+.sync-tag-out{background:#FBEAED;color:#9A0C23}
+.sync-lab{font-size:13px;color:#33465F;margin:0 0 8px}
+.sync-pl{margin:0 0 10px;padding-left:18px;font-size:13px;color:#33465F;line-height:1.7}
+.sync-note{font-size:12.5px;color:#5A6B82;margin:0 0 12px;line-height:1.5}
+.sync-tg{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.sync-tg select{flex:1 1 180px;min-width:0}
+.sync-rem{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#5A6B82;
+  margin-bottom:12px;line-height:1.45;cursor:pointer}
+.sync-rem input{margin:2px 0 0;flex:0 0 auto}
+.sync-act{display:flex;gap:8px;flex-wrap:wrap}
+.sync-empty{border:1px dashed #D6E0EC;border-radius:14px;padding:22px;text-align:center;background:#FBFCFE}
+.sync-et{font-family:var(--display);font-weight:500;font-size:15px;margin:0;color:var(--ink)}
+.sync-log{list-style:none;margin:0;padding:0;font-size:13px;color:#33465F}
+.sync-log li{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid #F0F4F9;line-height:1.5}
+.sync-log li:last-child{border-bottom:0}
+.sync-log span{flex:0 0 108px;color:#8696AC;font-variant-numeric:tabular-nums;font-size:12px}
+@media(max-width:640px){
+  .sync-top{flex-direction:column;align-items:stretch}
+  .sync-log li{flex-direction:column;gap:2px}
+  .sync-log span{flex:none}
+}
 .ownplain{font-size:14px;font-weight:400;color:#33465F;line-height:1.4}
 .golink{font:inherit;color:var(--navy);background:none;border:0;padding:0;cursor:pointer;
   font-weight:600;text-align:left;display:inline-flex;align-items:center;gap:5px;
@@ -1657,6 +1702,26 @@ function tidy(d){
   (d.admins||[]).forEach(a=>{
     if(a.owns!==undefined) a.owns = Array.isArray(a.owns) ? a.owns.filter(v=>typeof v==='string') : [];
   });
+  /* The Paychex queue. A malformed one must never take the page down, so
+     anything that is not the shape we expect is quietly dropped. */
+  if(d.sync!==undefined){
+    if(!d.sync || typeof d.sync!=='object' || Array.isArray(d.sync)) d.sync={};
+    const y=d.sync;
+    y.pending = Array.isArray(y.pending)
+      ? y.pending.filter(x=>x && typeof x==='object' && typeof x.id==='string'
+                           && (x.kind==='join'||x.kind==='leave'))
+                 .map(x=>{ if(x.kind==='leave')
+                             x.places = Array.isArray(x.places)
+                               ? x.places.filter(q=>q&&typeof q==='object') : [];
+                           return x; })
+      : [];
+    y.log = Array.isArray(y.log) ? y.log.filter(x=>x && typeof x==='object').slice(0,120) : [];
+    if(!y.map || typeof y.map!=='object' || Array.isArray(y.map)) y.map={};
+    ['cols','loc','dept','role'].forEach(k=>{
+      const v=y.map[k];
+      y.map[k] = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+    });
+  }
   return d;
 }
 
@@ -1736,7 +1801,7 @@ function renderGate(msg){
   renderAll();
 })();
 
-function renderAll(){ renderChips(); renderTabs(); renderPanel(); renderStamp(); renderDraft(); }
+function renderAll(){ renderChips(); renderTabs(); renderPanel(); renderStamp(); renderDraft(); renderBadge(); }
 
 /* Visible warning that what you're looking at is yours alone. */
 function renderDraft(){
@@ -2510,7 +2575,7 @@ function renderAdmin(){
   }
   $('.sheet-foot').style.display='';
   note(Store.status().t, Store.status().k==='ok'?'':(Store.status().k==='err'?'err':''));
-  const tabs=[['gaps','What\u2019s missing'],['sites','Sites'],['depts','Departments'],['people','Admin team'],['tasks','Quick tasks'],['settings','Settings']];
+  const tabs=[['gaps','What\u2019s missing'],['sites','Sites'],['depts','Departments'],['people','Admin team'],['tasks','Quick tasks'],['sync','Paychex'+(pendingCount()?' \u00b7 '+pendingCount():'')],['settings','Settings']];
   const st=Store.status();
   const banner = st.k==='ok' ? '' :
     `<div class="banner banner-${st.k==='err'?'warn':'warn'}">
@@ -2522,7 +2587,7 @@ function renderAdmin(){
     <div id="apane"></div>`;
   b.querySelectorAll('[data-atab]').forEach(el=>el.onclick=()=>{ ATAB=el.dataset.atab; renderAdmin(); });
   const gb=$('#goBackend'); if(gb) gb.onclick=()=>{ ATAB='settings'; renderAdmin(); const t=$('#bkUrl'); if(t && t.scrollIntoView) t.scrollIntoView({block:'center'}); };
-  ({gaps:paneGaps, sites:paneSites, depts:paneDepts, people:panePeople, tasks:paneTasks, settings:paneSet}[ATAB])();
+  ({gaps:paneGaps, sites:paneSites, depts:paneDepts, people:panePeople, tasks:paneTasks, sync:paneSync, settings:paneSet}[ATAB])();
 }
 
 /* member row editor (shared by sites + depts) */
@@ -3091,6 +3156,563 @@ function paneTasks(){
 }
 
 /* — Settings — */
+/* ──────────────────────────────────────────────────────────────────────────
+   Paychex sync.
+
+   Two rules hold this together:
+
+   1. Paychex is authoritative only for the people it knows about. Anyone it
+      has never heard of — the PIs, the partner-org staff, anyone not on this
+      payroll — is never a candidate for removal. Absence from the file means
+      nothing at all.
+   2. Nothing is applied until someone approves it here. The file only ever
+      proposes.
+
+   What leaves the building publicly is a vacancy, the same one the directory
+   already shows for an open post. The departed name and the date go to the
+   log below, which only this panel ever displays.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* the columns we need out of whatever shape the export arrives in */
+const SYNC_COLS = [
+  ['name',  'Full name',          /^(employee|worker)?\s*(full\s*)?name$/i],
+  ['first', 'First name',         /\b(first|given)\b/i],
+  ['last',  'Last name',          /\b(last|family|sur)\s*name\b/i],
+  ['email', 'Email',              /e-?mail/i],
+  ['status','Employment status',  /status/i],
+  ['title', 'Job title',          /job\s*title|^title$|position/i],
+  ['loc',   'Location',           /location|work\s*site|^site$/i],
+  ['dept',  'Department',         /department|organi[sz]ation|cost\s*cent/i],
+];
+
+function syncState(){
+  if(!DATA.sync || typeof DATA.sync!=='object' || Array.isArray(DATA.sync)) DATA.sync={};
+  const s=DATA.sync;
+  if(!Array.isArray(s.pending)) s.pending=[];
+  if(!Array.isArray(s.log)) s.log=[];
+  if(!s.map || typeof s.map!=='object' || Array.isArray(s.map)) s.map={};
+  ['cols','loc','dept','role'].forEach(k=>{
+    if(!s.map[k] || typeof s.map[k]!=='object' || Array.isArray(s.map[k])) s.map[k]={};
+  });
+  return s;
+}
+const pendingCount = () => (DATA.sync && Array.isArray(DATA.sync.pending)) ? DATA.sync.pending.length : 0;
+
+/* ── reading the file ────────────────────────────────────────────────────── */
+
+/* A hand-rolled reader, because a payroll export is full of quoted commas
+   ("Karim, Saghir, Riaz") and a naive split would cut names in half. */
+function csvRows(text){
+  let t=String(text||'').replace(/^﻿/,'');
+  const firstLine=t.slice(0, t.indexOf('\n')>0 ? t.indexOf('\n') : t.length);
+  const sep = (firstLine.split('\t').length > firstLine.split(',').length) ? '\t' : ',';
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){
+      if(c==='"'){ if(t[i+1]==='"'){ cur+='"'; i++; } else q=false; }
+      else cur+=c;
+    }
+    else if(c==='"') q=true;
+    else if(c===sep){ row.push(cur); cur=''; }
+    else if(c==='\r'){ /* ignore */ }
+    else if(c==='\n'){ row.push(cur); cur=''; rows.push(row); row=[]; }
+    else cur+=c;
+  }
+  if(cur!=='' || row.length){ row.push(cur); rows.push(row); }
+  return rows.map(r=>r.map(x=>String(x).trim()))
+             .filter(r=>r.some(x=>x!==''));
+}
+
+/* Guess which column is which, so the usual export needs no setup at all. */
+function guessCols(head){
+  const out={}, taken=new Set();
+  SYNC_COLS.forEach(([key,,re])=>{
+    const i=head.findIndex((h,j)=>!taken.has(j) && re.test(h));
+    if(i>=0){ out[key]=head[i]; taken.add(i); }
+  });
+  return out;
+}
+
+const normName = v => String(v||'').trim().replace(/\s+/g,' ').toLowerCase();
+const normMail = v => String(v||'').trim().toLowerCase();
+
+/* Paychex writes status in its own words. Only an unmistakable departure
+   counts; a leave of absence is not a departure, and anything we don't
+   recognise is left alone rather than guessed at. */
+function statusOf(v){
+  const s=String(v||'').trim().toLowerCase();
+  if(!s) return 'unknown';
+  if(/\b(terminat|separat|inactive|former|offboard)/.test(s)) return 'gone';
+  if(/\b(leave|loa|sabbatical|suspend)/.test(s)) return 'away';
+  if(/\b(active|employed|current|hired)/.test(s)) return 'here';
+  return 'unknown';
+}
+
+/* Turn the sheet into people, using whichever columns were mapped. */
+function syncPeople(rows, cols){
+  const head=rows[0]||[], body=rows.slice(1);
+  const col=key=>{ const h=cols[key]; return h ? head.indexOf(h) : -1; };
+  const idx={}; SYNC_COLS.forEach(([k])=>idx[k]=col(k));
+  const cell=(r,k)=> idx[k]>=0 ? String(r[idx[k]]||'').trim() : '';
+  return body.map(r=>{
+    let name=cell(r,'name');
+    if(!name) name=[cell(r,'first'),cell(r,'last')].filter(Boolean).join(' ');
+    return { name,
+             email:  normMail(cell(r,'email')),
+             title:  cell(r,'title'),
+             loc:    cell(r,'loc'),
+             dept:   cell(r,'dept'),
+             state:  statusOf(cell(r,'status')) };
+  }).filter(p=>p.name || p.email);
+}
+
+/* ── who the directory already knows ─────────────────────────────────────── */
+
+/* Every place a name appears, with a label a person would recognise.
+   Slots can hold several comma-separated people, so expand them. */
+function directoryHolders(){
+  const out=[];
+  const add=(where,slot,o)=>{
+    slotPeople(o).forEach(p=>{
+      if(p.name) out.push({where, slot, name:p.name, email:normMail(p.email)});
+    });
+  };
+  const SLOT={pis:'PI', crm:'Clinical Research Manager', lead:'Site lead',
+              backup:'Backup site lead', team:'CRC / site staff',
+              head:'Department lead', people:'Team member'};
+  (DATA.sites||[]).forEach(s=>{
+    const w=String(s.city||'').trim();
+    ['crm','lead','backup'].forEach(k=>add(w, SLOT[k], s[k]));
+    (s.pis||[]).forEach(p=>add(w, SLOT.pis, p));
+    (s.team||[]).forEach(p=>add(w, SLOT.team, p));
+  });
+  (DATA.depts||[]).forEach(d=>{
+    const w=String(d.name||'').trim();
+    add(w, SLOT.head, d.head);
+    (d.team||[]).forEach(p=>add(w, SLOT.team, p));
+  });
+  (DATA.admins||[]).forEach(a=>{
+    if(a.name) out.push({where:'Admin team', slot:'Member', name:a.name, email:normMail(a.email)});
+  });
+  return out;
+}
+
+/* Does the directory already have this person? Email first, because two
+   people can share a name but not an address. A name match alone is good
+   enough to recognise someone, never good enough to act on silently. */
+function heldBy(holders, p){
+  if(p.email){
+    const byMail=holders.filter(h=>h.email && h.email===p.email);
+    if(byMail.length) return byMail;
+  }
+  const n=normName(p.name);
+  return n ? holders.filter(h=>normName(h.name)===n) : [];
+}
+
+/* ── the diff ────────────────────────────────────────────────────────────── */
+
+function syncDiff(people){
+  const holders=directoryHolders();
+  const out=[];
+  /* One person can occupy several rows — two posts, a transfer, a rehire.
+     Someone still active anywhere is still here, whatever another row says;
+     only a person with no live row at all has actually gone. */
+  const byPerson=new Map();
+  people.forEach(p=>{
+    const key = p.email || normName(p.name);
+    if(!key) return;
+    const prev=byPerson.get(key);
+    if(!prev){ byPerson.set(key, p); return; }
+    const rank={here:3, away:2, gone:1, unknown:0};
+    if(rank[p.state] > rank[prev.state]) byPerson.set(key, Object.assign({}, p));
+  });
+  [...byPerson.values()].forEach(p=>{
+    const held=heldBy(holders, p);
+    if(p.state==='gone'){
+      /* Only propose a departure for someone actually in the directory. */
+      if(held.length) out.push({
+        id:'lv-'+Math.random().toString(36).slice(2,9), kind:'leave',
+        name:p.name, email:p.email, title:p.title,
+        places: held.map(h=>({where:h.where, slot:h.slot}))
+      });
+    } else if(p.state==='here'){
+      if(!held.length) out.push({
+        id:'jn-'+Math.random().toString(36).slice(2,9), kind:'join',
+        name:p.name, email:p.email, title:p.title, loc:p.loc, dept:p.dept,
+        target: guessTarget(p), remember:true
+      });
+    }
+    /* 'away' and 'unknown' are deliberately left alone. */
+  });
+  return out;
+}
+
+/* Where a new joiner probably belongs, from what we were told last time. */
+function guessTarget(p){
+  const m=syncState().map;
+  /* What we were told last time comes first. Failing that, a Paychex name
+     that happens to match a site or department here exactly is a safe guess —
+     "Regulatory Affairs" is "Regulatory Affairs". It is only ever a
+     suggestion; the reviewer still has to accept it. */
+  const place = (p.loc  && m.loc[normName(p.loc)])
+             || (p.dept && m.dept[normName(p.dept)])
+             || (p.loc  && teamRef(p.loc))
+             || (p.dept && teamRef(p.dept))
+             || '';
+  if(!place) return '';
+  const slot = (p.title && m.role[normName(p.title)]) || 'team';
+  return place + '/' + slot;
+}
+
+/* ── applying one change ─────────────────────────────────────────────────── */
+
+/* Take a name out of a slot that may hold several people, keeping the other
+   occupants and their details lined up. An emptied slot keeps its title, so
+   it reads as an open post rather than vanishing. */
+function dropFromSlot(o, name){
+  if(!o || !o.name) return false;
+  const n=normName(name);
+  const cut = v => String(v||'').split(',').map(x=>x.trim());
+  const names=cut(o.name);
+  const hit=names.findIndex(x=>normName(x)===n);
+  if(hit<0) return false;
+  const keep=(v)=>{ const a=cut(v); a.splice(hit,1); return a.join(', ').replace(/^(,\s*)+|(,\s*)+$/g,''); };
+  if(names.length>1){
+    o.name=keep(o.name);
+    if(o.title && cut(o.title).length>1) o.title=keep(o.title);
+    if(o.email) o.email=keep(o.email);
+    if(o.phone) o.phone=keep(o.phone);
+  } else {
+    o.name=''; o.email=''; o.phone='';   /* title stays: the post is open */
+  }
+  return true;
+}
+
+/* Remove someone from every slot in the directory. Returns what was touched. */
+function removeEverywhere(name, email){
+  const n=normName(name), e=normMail(email);
+  const touched=[];
+  const isThem = o => {
+    if(!o || !o.name) return false;
+    if(e && String(o.email||'').toLowerCase().split(',').some(x=>x.trim()===e)) return true;
+    return String(o.name).split(',').some(x=>normName(x)===n);
+  };
+  const pull=(arr,where,slot)=>{
+    if(!Array.isArray(arr)) return;
+    for(let i=arr.length-1;i>=0;i--){
+      if(isThem(arr[i])){
+        if(String(arr[i].name||'').split(',').length>1){ dropFromSlot(arr[i], name); }
+        else arr.splice(i,1);
+        touched.push(where+' — '+slot);
+      }
+    }
+  };
+  (DATA.sites||[]).forEach(s=>{
+    const w=String(s.city||'').trim();
+    [['crm','Clinical Research Manager'],['lead','Site lead'],['backup','Backup site lead']]
+      .forEach(([k,lab])=>{ if(isThem(s[k]) && dropFromSlot(s[k], name)) touched.push(w+' — '+lab); });
+    pull(s.pis,  w, 'PI');
+    pull(s.team, w, 'CRC / site staff');
+  });
+  (DATA.depts||[]).forEach(d=>{
+    const w=String(d.name||'').trim();
+    if(isThem(d.head) && dropFromSlot(d.head, name)) touched.push(w+' — Department lead');
+    pull(d.team, w, 'Team member');
+  });
+  if(Array.isArray(DATA.admins)){
+    for(let i=DATA.admins.length-1;i>=0;i--){
+      const a=DATA.admins[i];
+      if(a && (normName(a.name)===n || (e && normMail(a.email)===e))){
+        DATA.admins.splice(i,1); touched.push('Admin team');
+      }
+    }
+  }
+  return touched;
+}
+
+/* Put a new person where the reviewer said they go. */
+function addToTarget(ref, person){
+  const [place, slot] = String(ref||'').split('/');
+  const [kind, id] = String(place||'').split(':');
+  const host = kind==='site' ? (DATA.sites||[]).find(s=>s.id===id)
+             : kind==='dept' ? (DATA.depts||[]).find(d=>d.id===id) : null;
+  if(!host) return '';
+  const rec={name:person.name, title:person.title||'', email:person.email||'', phone:''};
+  const label = kind==='site' ? String(host.city||'').trim() : String(host.name||'').trim();
+  if(slot==='team' || slot==='pis'){
+    if(!Array.isArray(host[slot])) host[slot]=[];
+    host[slot].push(rec);
+    return label+' — '+(slot==='pis'?'PI':'team');
+  }
+  if(!host[slot] || typeof host[slot]!=='object') host[slot]={name:'',title:'',email:'',phone:''};
+  const o=host[slot];
+  if(String(o.name||'').trim()){          /* someone is already there — sit alongside them */
+    o.name  = o.name+', '+rec.name;
+    o.title = (o.title||'')+', '+(rec.title||'');
+    o.email = (o.email||'')+', '+(rec.email||'');
+  } else {
+    o.name=rec.name; if(rec.title) o.title=rec.title; o.email=rec.email;
+  }
+  return label+' — '+slot;
+}
+
+function syncLog(what){
+  const s=syncState();
+  s.log.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '), what});
+  if(s.log.length>120) s.log.length=120;
+}
+
+function applyPending(id){
+  const s=syncState();
+  const i=s.pending.findIndex(x=>x.id===id);
+  if(i<0) return;
+  const c=s.pending[i];
+  snapshot(c.kind==='leave' ? 'removing '+c.name : 'adding '+c.name);
+  if(c.kind==='leave'){
+    const touched=removeEverywhere(c.name, c.email);
+    if(!touched.length){ note('Could not find '+c.name+' any more — nothing changed.','err'); return; }
+    syncLog(c.name+' left Paychex — cleared from '+touched.join('; '));
+    toast(c.name+' cleared from '+touched.length+' place'+(touched.length>1?'s':''));
+  } else {
+    if(!c.target){ note('Choose where '+c.name+' goes first.','err'); return; }
+    const where=addToTarget(c.target, c);
+    if(!where){ note('That place no longer exists — pick another.','err'); return; }
+    if(c.remember) rememberMapping(c);
+    syncLog(c.name+' joined — added to '+where);
+    toast(c.name+' added to '+where);
+  }
+  s.pending.splice(i,1);
+  dirty(); renderAll(); renderAdmin();
+}
+
+/* Learn the location and title mapping from what the reviewer chose, so the
+   same site and the same job title need no thought next time. */
+function rememberMapping(c){
+  const m=syncState().map;
+  const [place, slot]=String(c.target||'').split('/');
+  if(c.loc  && place) m.loc[normName(c.loc)]=place;
+  if(c.dept && place && !c.loc) m.dept[normName(c.dept)]=place;
+  if(c.title && slot) m.role[normName(c.title)]=slot;
+}
+
+function skipPending(id){
+  const s=syncState();
+  const i=s.pending.findIndex(x=>x.id===id);
+  if(i<0) return;
+  syncLog('Skipped: '+s.pending[i].name+' ('+s.pending[i].kind+')');
+  s.pending.splice(i,1);
+  dirty(); renderAdmin(); renderBadge();
+}
+
+/* ── the panel ───────────────────────────────────────────────────────────── */
+
+/* Ordinary staff first, deliberately. Whatever sits at the top is what a
+   distracted reviewer accepts by default, so the default must be the
+   harmless one — a new coordinator quietly becoming a site's CRM is exactly
+   the kind of silent mistake this panel exists to prevent. */
+const SITE_SLOTS=[['team','CRC / site staff'],['crm','Clinical Research Manager'],
+                  ['lead','Site lead'],['backup','Backup site lead'],['pis','PI']];
+const DEPT_SLOTS=[['team','Team member'],['head','Department lead']];
+
+function placeOptions(sel){
+  const g=(label,rows)=>rows.length?`<optgroup label="${label}">${rows.join('')}</optgroup>`:'';
+  const sites=(DATA.sites||[]).map(s=>{
+    const v='site:'+s.id;
+    return `<option value="${esc(v)}" ${sel===v?'selected':''}>${esc(String(s.city||'').trim())}</option>`;
+  });
+  const depts=(DATA.depts||[]).map(d=>{
+    const v='dept:'+d.id;
+    return `<option value="${esc(v)}" ${sel===v?'selected':''}>${esc(String(d.name||'').trim())}</option>`;
+  });
+  return `<option value="">Choose…</option>`+g('Sites',sites)+g('Departments',depts);
+}
+function slotOptions(place, sel){
+  const rows = String(place||'').startsWith('dept:') ? DEPT_SLOTS : SITE_SLOTS;
+  return rows.map(([k,l])=>`<option value="${esc(k)}" ${sel===k?'selected':''}>${esc(l)}</option>`).join('');
+}
+
+function paneSync(){
+  const s=syncState();
+  const p=$('#apane');
+  const cols=s.map.cols||{};
+  const mapped=Object.keys(cols).length>0;
+
+  const joiners=s.pending.filter(x=>x.kind==='join');
+  const leavers=s.pending.filter(x=>x.kind==='leave');
+
+  const card=c=>{
+    if(c.kind==='leave') return `
+      <div class="sync-c sync-out" data-pid="${esc(c.id)}">
+        <div class="sync-h">
+          <div><p class="sync-n">${esc(c.name)}</p>
+               <p class="sync-s">No longer active in Paychex</p></div>
+          <span class="sync-tag sync-tag-out">Leaving</span>
+        </div>
+        <p class="sync-lab">Holds ${c.places.length} place${c.places.length>1?'s':''} in the directory</p>
+        <ul class="sync-pl">${c.places.map(x=>`<li><b>${esc(x.where)}</b> — ${esc(x.slot)}</li>`).join('')}</ul>
+        <p class="sync-note">Each one becomes an open post. No name is shown to anyone reading the directory.</p>
+        <div class="sync-act">
+          <button class="btn btn-solid btn-sm" data-papply="${esc(c.id)}">Clear these slots</button>
+          <button class="btn btn-sm" data-pskip="${esc(c.id)}">Not now</button>
+        </div>
+      </div>`;
+    const [place,slot]=String(c.target||'').split('/');
+    return `
+      <div class="sync-c sync-in" data-pid="${esc(c.id)}">
+        <div class="sync-h">
+          <div><p class="sync-n">${esc(c.name)}</p>
+               <p class="sync-s">${esc(c.title||'No job title given')}</p></div>
+          <span class="sync-tag sync-tag-in">New</span>
+        </div>
+        <p class="sync-lab">Paychex says${c.loc?` <b>${esc(c.loc)}</b>`:''}${c.dept?` · <b>${esc(c.dept)}</b>`:''}${(!c.loc&&!c.dept)?' nothing about where they sit':''}</p>
+        <div class="sync-tg">
+          <select data-pplace="${esc(c.id)}">${placeOptions(place||'')}</select>
+          <select data-pslot="${esc(c.id)}" ${place?'':'disabled'}>${slotOptions(place||'', slot||'')}</select>
+        </div>
+        <label class="sync-rem"><input type="checkbox" data-prem="${esc(c.id)}" ${c.remember!==false?'checked':''}>
+          Remember this, so the next person from ${esc(c.loc||c.dept||'there')} goes to the same place</label>
+        <div class="sync-act">
+          <button class="btn btn-solid btn-sm" data-papply="${esc(c.id)}" ${place?'':'disabled'}>Add them</button>
+          <button class="btn btn-sm" data-pskip="${esc(c.id)}">Not now</button>
+        </div>
+      </div>`;
+  };
+
+  const colPicker = (!mapped || SYNCFILE) && SYNCHEAD.length ? `
+    <div class="sync-box">
+      <p class="sync-bt">Which column is which?</p>
+      <p class="sec-note" style="margin:0 0 12px">Only the email and the status really matter. The rest just saves you typing.</p>
+      <div class="fgrid">
+        ${SYNC_COLS.filter(([k])=>k!=='first'&&k!=='last'||!cols.name).map(([k,label])=>`
+          <div class="f"><label>${esc(label)}</label>
+            <select data-col="${esc(k)}">
+              <option value="">— not in this file —</option>
+              ${SYNCHEAD.map(h=>`<option value="${esc(h)}" ${cols[k]===h?'selected':''}>${esc(h)}</option>`).join('')}
+            </select></div>`).join('')}
+      </div>
+      <div class="sync-act" style="margin-top:14px">
+        <button class="btn btn-solid btn-sm" id="syncRun">See what changed</button>
+        <button class="btn btn-sm" id="syncCancel">Cancel</button>
+      </div>
+    </div>` : '';
+
+  const queue = s.pending.length ? `
+    <p class="sync-count">${s.pending.length} waiting${leavers.length?` · ${leavers.length} leaving`:''}${joiners.length?` · ${joiners.length} new`:''}</p>
+    <div class="sync-list">${s.pending.map(card).join('')}</div>
+    <div class="sync-act" style="margin-top:4px">
+      <button class="btn btn-sm" id="syncClear">Clear the whole queue</button>
+    </div>` : `
+    <div class="sync-empty">
+      <p class="sync-et">Nothing waiting</p>
+      <p class="sec-note" style="margin:6px 0 0">When you bring in a roster, anything that differs from the directory shows up here for you to approve. Nothing is ever applied on its own.</p>
+    </div>`;
+
+  const log = s.log.length ? `
+    <h3 class="sync-h3">What the sync has done</h3>
+    <p class="sec-note" style="margin:0 0 10px">Only ever shown here. The directory itself never names anyone who has left.</p>
+    <ul class="sync-log">${s.log.slice(0,25).map(x=>
+      `<li><span>${esc(x.at)}</span>${esc(x.what)}</li>`).join('')}</ul>` : '';
+
+  p.innerHTML=`
+    <div class="sync-top">
+      <div>
+        <h3 class="sync-h3" style="margin:0">Roster from Paychex</h3>
+        <p class="sec-note" style="margin:4px 0 0">Export an employee report from Paychex Flex — Reporting, then Analytics — with name, email, employment status, job title and location. CSV or tab-separated.</p>
+      </div>
+      <button class="btn btn-solid btn-sm" id="syncPick">Choose a file</button>
+    </div>
+    ${colPicker}
+    ${queue}
+    ${log}`;
+
+  $('#syncPick').onclick=()=>{
+    const inp=document.createElement('input'); inp.type='file';
+    inp.accept='.csv,.tsv,.txt,text/csv,text/plain';
+    inp.onchange=()=>{ const f=inp.files[0]; if(!f) return;
+      const r=new FileReader();
+      r.onload=()=>{ loadRoster(String(r.result||'')); };
+      r.onerror=()=>note("Couldn't read that file.",'err');
+      r.readAsText(f); };
+    inp.click();
+  };
+
+  p.querySelectorAll('[data-col]').forEach(el=>el.onchange=()=>{
+    const m=syncState().map; m.cols[el.dataset.col]=el.value; dirty();
+  });
+  const run=$('#syncRun'); if(run) run.onclick=()=>runDiff();
+  const can=$('#syncCancel'); if(can) can.onclick=()=>{ SYNCFILE=null; SYNCHEAD=[]; renderAdmin(); };
+
+  p.querySelectorAll('[data-pplace]').forEach(el=>el.onchange=()=>{
+    const c=syncState().pending.find(x=>x.id===el.dataset.pplace); if(!c) return;
+    const slotSel=p.querySelector(`[data-pslot="${c.id}"]`);
+    c.target = el.value ? el.value+'/'+(String(el.value).startsWith('dept:')?'team':'team') : '';
+    if(slotSel){ slotSel.innerHTML=slotOptions(el.value,'team'); slotSel.disabled=!el.value; }
+    const go=p.querySelector(`[data-papply="${c.id}"]`); if(go) go.disabled=!el.value;
+    dirty();
+  });
+  p.querySelectorAll('[data-pslot]').forEach(el=>el.onchange=()=>{
+    const c=syncState().pending.find(x=>x.id===el.dataset.pslot); if(!c) return;
+    const place=String(c.target||'').split('/')[0];
+    if(place){ c.target=place+'/'+el.value; dirty(); }
+  });
+  p.querySelectorAll('[data-prem]').forEach(el=>el.onchange=()=>{
+    const c=syncState().pending.find(x=>x.id===el.dataset.prem); if(c){ c.remember=el.checked; dirty(); }
+  });
+  p.querySelectorAll('[data-papply]').forEach(el=>el.onclick=()=>applyPending(el.dataset.papply));
+  p.querySelectorAll('[data-pskip]').forEach(el=>el.onclick=()=>skipPending(el.dataset.pskip));
+  const cl=$('#syncClear'); if(cl) cl.onclick=()=>{
+    if(cl.dataset.armed){ const n=syncState().pending.length;
+      syncState().pending=[]; syncLog('Queue cleared ('+n+' change'+(n===1?'':'s')+' dropped)');
+      dirty(); renderAdmin(); renderBadge(); toast('Queue cleared'); }
+    else { cl.dataset.armed='1'; cl.textContent='Drop them all?';
+      setTimeout(()=>{ if(cl.isConnected){ delete cl.dataset.armed; cl.textContent='Clear the whole queue'; } },3500); }
+  };
+}
+
+let SYNCFILE=null, SYNCHEAD=[];
+
+function loadRoster(text){
+  const rows=csvRows(text);
+  if(rows.length<2){ note("That file has no rows I can read.",'err'); return; }
+  SYNCFILE=rows; SYNCHEAD=rows[0];
+  const s=syncState();
+  const have=s.map.cols||{};
+  const usable=SYNCHEAD.length && Object.values(have).some(v=>v && SYNCHEAD.includes(v));
+  if(!usable) s.map.cols=guessCols(SYNCHEAD);
+  /* If the guess found both of the fields that matter, go straight to the diff. */
+  const c=s.map.cols;
+  if(c.status && (c.email || c.name || (c.first&&c.last))) runDiff();
+  else { note('Tell me which column is which and I will take it from there.'); renderAdmin(); }
+}
+
+function runDiff(){
+  if(!SYNCFILE){ note('Choose a file first.','err'); return; }
+  const s=syncState();
+  const people=syncPeople(SYNCFILE, s.map.cols||{});
+  if(!people.length){ note('No people found in that file — check the column mapping.','err'); return; }
+  const found=syncDiff(people);
+  const known=people.filter(p=>p.state!=='unknown').length;
+  s.pending=found;
+  SYNCFILE=null; SYNCHEAD=[];
+  syncLog('Read a roster of '+people.length+' — '+found.length+' change'+(found.length===1?'':'s')+' to review');
+  dirty(); renderAdmin(); renderBadge();
+  if(!found.length) toast('Read '+people.length+' people — the directory already matches');
+  else toast(found.length+' change'+(found.length===1?'':'s')+' to review');
+  if(known<people.length) note((people.length-known)+' row'+(people.length-known===1?' had':'s had')+" a status I didn't recognise — those were left alone.");
+}
+
+/* ── the count on the Manage button ──────────────────────────────────────── */
+function renderBadge(){
+  const b=$('#manageBtn'); if(!b) return;
+  const n=pendingCount();
+  let dot=b.querySelector('.mbadge');
+  if(!n){ if(dot) dot.remove(); b.removeAttribute('title'); return; }
+  if(!dot){ dot=document.createElement('span'); dot.className='mbadge'; b.appendChild(dot); }
+  dot.textContent = n>9 ? '9+' : String(n);
+  b.title = n+' change'+(n===1?'':'s')+' from Paychex waiting for you';
+}
+
 function paneSet(){
   const c=DATA.config;
   $('#apane').innerHTML=`<div class="fgrid" style="margin-top:0">
