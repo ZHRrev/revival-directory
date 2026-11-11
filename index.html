@@ -1763,6 +1763,8 @@ function tidy(d){
     if(!y.watch || typeof y.watch!=='object' || Array.isArray(y.watch)) y.watch={};
     if(!y.seen || typeof y.seen!=='object' || Array.isArray(y.seen)) y.seen={};
     if(!y.link || typeof y.link!=='object' || Array.isArray(y.link)) y.link={};
+    if(!y.digest || typeof y.digest!=='object' || Array.isArray(y.digest)) y.digest={};
+    if(typeof y.digest.to!=='string') y.digest.to='';
     if(!y.map || typeof y.map!=='object' || Array.isArray(y.map)) y.map={};
     ['cols','loc','dept','role'].forEach(k=>{
       const v=y.map[k];
@@ -3322,10 +3324,13 @@ function syncState(){
   if(!s.watch || typeof s.watch!=='object' || Array.isArray(s.watch)) s.watch={};
   if(!s.seen || typeof s.seen!=='object' || Array.isArray(s.seen)) s.seen={};
   if(!s.link || typeof s.link!=='object' || Array.isArray(s.link)) s.link={};
+  if(!s.digest || typeof s.digest!=='object' || Array.isArray(s.digest)) s.digest={};
   if(!s.map || typeof s.map!=='object' || Array.isArray(s.map)) s.map={};
   ['cols','loc','dept','role'].forEach(k=>{
     if(!s.map[k] || typeof s.map[k]!=='object' || Array.isArray(s.map[k])) s.map[k]={};
   });
+  const d=Number(s.map.days);
+  if(!isFinite(d) || d<1) s.map.days=30; else s.map.days=Math.min(3650,Math.floor(d));
   return s;
 }
 const pendingCount = () => (DATA.sync && Array.isArray(DATA.sync.pending)) ? DATA.sync.pending.length : 0;
@@ -3528,7 +3533,7 @@ function syncDiff(people){
         const mails=(p.emails&&p.emails.length)?p.emails:(p.email?[p.email]:[]);
         out.push({
           id:'jn-'+rnd(), kind:'join',
-          name:p.name, empid:p.empid||'', title:p.title, loc:p.loc, dept:p.dept,
+          name:p.name, empid:p.empid||'', wid:p.wid||'', title:p.title, loc:p.loc, dept:p.dept,
           match: mails[0]||'',                 /* for recognising them next time */
           email: p.email||'',                  /* already filtered to a work address */
           personal: !!(mails.length && !p.email),
@@ -3927,6 +3932,8 @@ function slotOptions(place, sel){
 
 function paneSync(){
   const s=syncState();
+  if(!s.digest || typeof s.digest!=='object' || Array.isArray(s.digest)) s.digest={};
+  const dig=s.digest;
   const p=$('#apane');
   const cols=s.map.cols||{};
   const mapped=Object.keys(cols).length>0;
@@ -4057,6 +4064,9 @@ function paneSync(){
     <div class="sync-sw">
       <label><input type="checkbox" data-watch="title" ${watch.title===false?'':'checked'}> Flag title changes</label>
       <label><input type="checkbox" data-watch="move" ${watch.move===false?'':'checked'}> Flag site moves</label>
+      <label><input type="checkbox" data-watch="contractors" ${watch.contractors===false?'':'checked'}> Include contractors</label>
+      <label style="gap:6px">Look back <input id="syncDays" type="number" min="1" max="3650"
+        value="${esc(String(s.map.days||30))}" style="width:68px"> days</label>
       <span class="sync-swn">Payroll writes job titles its own way. If these fill up with differences that are not really changes, turn them off.</span>
     </div>`;
 
@@ -4081,15 +4091,29 @@ function paneSync(){
     <div class="sync-top">
       <div>
         <h3 class="sync-h3" style="margin:0">Roster from Paychex</h3>
-        <p class="sec-note" style="margin:4px 0 0">Export an employee report from Paychex Flex — Reporting, then Analytics — with name, email, employment status, job title and location. CSV or tab-separated.</p>
+        <p class="sec-note" style="margin:4px 0 0">Reads whoever joined, left or changed in Paychex within the window below. Only ten fields ever leave Paychex — name, job title, status and where they sit. Pay, Social Security numbers, dates of birth and home addresses are never read at all.</p>
       </div>
-      <button class="btn btn-solid btn-sm" id="syncPick">Choose a file</button>
+      <div class="sync-act">
+        <button class="btn btn-solid btn-sm" id="syncPull">Pull from Paychex</button>
+        <button class="btn btn-sm" id="syncPick">Or choose a file</button>
+      </div>
     </div>
     <div class="sync-box" id="pcxBox">
       <p class="sync-bt">Paychex connection</p>
       <p class="sec-note" style="margin:0 0 12px">Checks the two credentials on the server — whether they work, whether they are the right way round, and what a worker record looks like. Nothing secret is ever shown.</p>
       <div class="sync-act"><button class="btn btn-sm" id="pcxTest">Test the connection</button></div>
       <div id="pcxOut"></div>
+    </div>
+    <div class="sync-box">
+      <p class="sync-bt">Email reminder</p>
+      <p class="sec-note" style="margin:0 0 12px">Monday mornings, and only when something is actually waiting. It carries a count and a link — never anyone's name, because a departure does not need to sit in an inbox.</p>
+      <div class="sync-f sync-f1" style="margin-bottom:12px">
+        <label>Send it to</label>
+        <input id="digTo" value="${esc(dig.to||'')}" placeholder="name@rev-research.com, someone.else@rev-research.com">
+        <span class="sync-swn">Separate several addresses with commas. Changing this never needs a deploy.</span>
+      </div>
+      <div class="sync-act"><button class="btn btn-sm" id="digTest">Send one now</button></div>
+      <div id="digOut"></div>
     </div>
     <div class="sync-f sync-f1" style="margin-bottom:16px">
       <label>Work email domains</label>
@@ -4139,7 +4163,26 @@ function paneSync(){
     const m=syncState().map; m.cols[el.dataset.col]=el.value; dirty();
   });
   const pt=$('#pcxTest'); if(pt) pt.onclick=()=>runPaychexTest(pt);
+  const dt=$('#digTo'); if(dt) dt.oninput=()=>{ syncState().digest.to=dt.value; dirty(); };
+  const dg=$('#digTest'); if(dg) dg.onclick=async()=>{
+    const out=$('#digOut'); const was=dg.textContent;
+    if(!String((syncState().digest||{}).to||'').trim()){
+      out.innerHTML='<p class="pcx-bad">Put an address in first.</p>'; return; }
+    if(Store.dirty && Store.dirty()){ /* no-op, just a guard if one exists */ }
+    dg.disabled=true; dg.textContent='Sending…';
+    out.innerHTML='<p class="sec-note" style="margin:12px 0 0">Saving the address, then sending.</p>';
+    try{
+      await Store.save(DATA);                 /* the server reads the address from storage */
+      const r=await pcxCall('digest-run',{test:true});
+      out.innerHTML = r && r.ok
+        ? `<p class="pcx-ok"><b>Sent.</b> Check ${esc((r.to||[]).join(', ')||'your inbox')}. If it has not arrived in a few minutes, look in spam — and at whether Resend will send from the address you configured.</p>`
+        : `<p class="pcx-bad">${esc((r&&r.problem)||'It did not send.')}</p>${r&&r.detail?`<p class="sync-was">${esc(r.detail)}</p>`:''}`;
+    }catch(e){ out.innerHTML=`<p class="pcx-bad">${esc(e.message||'Could not reach the server.')}</p>`; }
+    dg.disabled=false; dg.textContent=was;
+  };
   const dm=$('#syncDoms'); if(dm) dm.oninput=()=>{ syncState().map.domains=dm.value; dirty(); };
+  const dy=$('#syncDays'); if(dy) dy.oninput=()=>{ syncState().map.days=Math.max(1,Math.min(3650,+dy.value||30)); dirty(); };
+  const pl=$('#syncPull'); if(pl) pl.onclick=()=>pullFromPaychex(pl);
   const run=$('#syncRun'); if(run) run.onclick=()=>runDiff();
   const can=$('#syncCancel'); if(can) can.onclick=()=>{ SYNCFILE=null; SYNCHEAD=[]; SYNCSAMPLE=[]; renderAdmin(); };
 
@@ -4195,6 +4238,66 @@ function paneSync(){
 }
 
 let SYNCFILE=null, SYNCHEAD=[], SYNCSAMPLE=[];
+
+/* Ask the server for whatever changed in Paychex recently.
+
+   The server hands back ten fields a person, and only for people whose status
+   moved inside the window. Everything the diff engine does from here on is
+   the same code the uploaded file goes through, so there is one set of rules
+   about what may be proposed, not two. */
+async function pcxCall(action, extra){
+  if(Store.mode!=='proxy') throw new Error('This needs the Netlify function. The directory is in '+Store.mode+' mode.');
+  const res=await fetch(Store.endpoint,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-admin-key':Store.adminKey||''},
+    body: JSON.stringify(Object.assign({action}, extra||{}))
+  });
+  if(res.status===401) throw new Error('Sign in to Manage again — the session was lost.');
+  if(res.status===400) throw new Error('This Netlify function is the older one. Upload the new directory.js and deploy.');
+  return res.json();
+}
+
+async function pullFromPaychex(btn){
+  const was=btn.textContent; btn.disabled=true; btn.textContent='Pulling…';
+  try{
+    const days=syncState().map.days||30;
+    const r=await pcxCall('paychex-pull',{days});
+    if(!r.ok){ note(r.problem||'Paychex would not answer.','err'); return; }
+    const keepContractors=(syncState().watch||{}).contractors!==false;
+    const rows=(r.rows||[]).filter(x=>keepContractors || x.kind!=='INDEPENDENT_CONTRACTOR');
+    /* Into the shape the file reader produces, so one diff engine serves both. */
+    const people=rows.map(x=>({
+      name: flipName(x.name), empid:x.empid, wid:x.wid, emails:[], email:'',
+      title:x.title, loc:x.loc, dept:x.dept, state:statusOf(x.status)
+    }));
+    people.skipped=0;
+    if(!people.length){
+      syncLog('Pulled from Paychex — nothing changed in the last '+r.days+' days');
+      dirty(); renderAdmin();
+      toast('Nothing has changed in the last '+r.days+' days'); return;
+    }
+    const found=syncDiff(people);
+    recordSeen(people);
+    syncState().pending=found;
+    syncLog('Pulled from Paychex — '+people.length+' changed in '+r.days+' days, '+found.length+' to review');
+    /* Addresses cost a call each, so ask only for the people being added. */
+    const joiners=found.filter(c=>c.kind==='join' && c.wid);
+    if(joiners.length){
+      btn.textContent='Getting addresses…';
+      try{
+        const em=await pcxCall('paychex-emails',{ids:joiners.map(c=>c.wid).slice(0,12), domains:workDomains()});
+        if(em && em.found) joiners.forEach(c=>{
+          const hit=em.found[c.wid];
+          if(hit){ c.email=hit.email||''; c.personal=!hit.email && !!hit.had; }
+        });
+      }catch(e){ note('Added them, but could not fetch work emails: '+(e.message||''),'err'); }
+    }
+    dirty(); renderAdmin();
+    toast(found.length ? found.length+' change'+(found.length===1?'':'s')+' to review'
+                       : 'Nothing to change — the directory already matches');
+  }catch(e){ note(e.message||'Could not reach the server.','err'); }
+  finally{ btn.disabled=false; btn.textContent=was; }
+}
 
 /* Ask the server to try the Paychex credentials. They live only in Netlify's
    environment; this page never sees them and never sends them. */
