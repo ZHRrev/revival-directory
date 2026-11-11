@@ -3377,16 +3377,47 @@ function syncPeople(rows, cols){
   };
   const idx={}; SYNC_COLS.forEach(([k])=>idx[k]=col(k));
   const cell=(r,k)=> idx[k]>=0 ? String(r[idx[k]]||'').trim() : '';
+
+  /* Payroll keeps more than one address for a person — the work one, the
+     Flex sign-in, sometimes a personal one — and which of them is filled in
+     varies. So gather every address on the row and let the work domain
+     decide which may be published; the rest are still worth keeping, because
+     any of them can recognise the person next time.
+
+     Columns belonging to somebody else are left out. A manager's address
+     sitting on an employee's row is not that employee's address. */
+  const NOT_THEIRS=/manager|supervisor|emergency|next of kin|spouse|contact name|recruiter/i;
+  const mailCols=(()=>{
+    if(idx.email>=0) return [idx.email];
+    const found=[];
+    const n=Math.max(...body.map(r=>r.length), head.length);
+    for(let i=0;i<n;i++){
+      if(headed && NOT_THEIRS.test(String(head[i]||''))) continue;
+      const hits=body.filter(r=>/\S+@\S+\.\S+/.test(String(r[i]||''))).length;
+      if(hits && hits >= body.length*0.3) found.push(i);
+    }
+    return found;
+  })();
+  const mailsOn=r=>{
+    const seen=new Set();
+    mailCols.forEach(i=>String(r[i]||'').split(/[;,\s]+/).forEach(v=>{
+      const e=normMail(v); if(/^\S+@\S+\.\S+$/.test(e)) seen.add(e);
+    }));
+    return [...seen].sort();
+  };
+
+  const doms=workDomains();
   const out=[]; let skipped=0;
   body.forEach(r=>{
     let name=cell(r,'name');
     if(!name) name=[cell(r,'first'),cell(r,'last')].filter(Boolean).join(' ');
     name=flipName(name);
     const empid=cell(r,'empid');
-    if(!name && !cell(r,'email')) return;
+    const emails=mailsOn(r);
+    if(!name && !emails.length) return;
     if(isPlaceholder(name, empid)){ skipped++; return; }
-    out.push({ name, empid,
-               email:  normMail(cell(r,'email')),
+    out.push({ name, empid, emails,
+               email:  emails.find(e=>isWorkEmail(e, doms)) || '',  /* only this may be shown */
                title:  cell(r,'title'),
                loc:    cell(r,'loc'),
                dept:   cell(r,'dept'),
@@ -3440,8 +3471,9 @@ function heldBy(holders, p){
     const by=holders.filter(h=>h.email===link || normName(h.name)===normName(link));
     if(by.length) return by;
   }
-  if(p.email){
-    const byMail=holders.filter(h=>h.email && h.email===p.email);
+  const mails=(p.emails && p.emails.length) ? p.emails : (p.email?[p.email]:[]);
+  for(const e of mails){
+    const byMail=holders.filter(h=>h.email && h.email===e);
     if(byMail.length) return byMail;
   }
   const n=normName(p.name);
@@ -3476,13 +3508,13 @@ function syncDiff(people){
       });
     } else if(p.state==='here'){
       if(!held.length){
-        const doms=workDomains();
+        const mails=(p.emails&&p.emails.length)?p.emails:(p.email?[p.email]:[]);
         out.push({
           id:'jn-'+rnd(), kind:'join',
           name:p.name, empid:p.empid||'', title:p.title, loc:p.loc, dept:p.dept,
-          match: p.email,                               /* for recognising them next time */
-          email: isWorkEmail(p.email, doms) ? p.email : '',   /* only a work address is published */
-          personal: !!(p.email && !isWorkEmail(p.email, doms)),
+          match: mails[0]||'',                 /* for recognising them next time */
+          email: p.email||'',                  /* already filtered to a work address */
+          personal: !!(mails.length && !p.email),
           phone:'', target: guessTarget(p), remember:true
         });
       } else {
@@ -3596,7 +3628,9 @@ function siteMove(p, held){
 
 /* Who this row is about. A payroll ID survives a change of name or address,
    so prefer it; a file without one falls back to the address, then the name. */
-const personKey = p => (p.empid ? 'emp:'+String(p.empid).trim() : '') || p.email || normName(p.name);
+const personKey = p => (p.empid ? 'emp:'+String(p.empid).trim() : '')
+                    || (p.emails && p.emails.length ? p.emails[0] : p.email)
+                    || normName(p.name);
 
 /* Remember where payroll had each person, so the next roster can tell a
    real move from the usual difference in filing. */
