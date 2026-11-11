@@ -313,6 +313,21 @@ select:disabled{opacity:.5;cursor:not-allowed;background:#F4F7FB}
 .sync-list{display:flex;flex-direction:column;gap:12px}
 .sync-c{border:1px solid #E6ECF4;border-radius:14px;padding:15px 16px;background:#fff}
 .sync-in{border-left:3px solid #1A7F8E}
+.sync-ti{border-left:3px solid #B07A1E}
+.sync-mv{border-left:3px solid #4457A6}
+.sync-tag-ti{background:#FBF2E2;color:#8A5D0C}
+.sync-tag-mv{background:#ECEFF8;color:#36468A}
+.sync-pk{list-style:none;margin:0 0 12px;padding:0}
+.sync-pk li{border-top:1px solid #F0F4F9}
+.sync-pk li:last-child{border-bottom:1px solid #F0F4F9}
+.sync-pk label{display:flex;gap:10px;align-items:flex-start;padding:9px 2px;
+  font-size:13px;color:#33465F;line-height:1.45;cursor:pointer}
+.sync-pk input{margin:2px 0 0;flex:0 0 auto}
+.sync-was{color:#8696AC;font-size:12px}
+.sync-sw{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:0 0 18px;
+  padding:12px 14px;border:1px solid #E6ECF4;border-radius:12px;background:#FBFCFE}
+.sync-sw label{display:flex;gap:8px;align-items:center;font-size:13px;color:#33465F;cursor:pointer}
+.sync-swn{flex:1 1 100%;font-size:12.5px;color:#8696AC;line-height:1.45}
 .sync-out{border-left:3px solid #C8102E}
 .sync-h{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
 .sync-n{font-family:var(--display);font-weight:600;font-size:15px;margin:0;color:var(--ink)}
@@ -1709,13 +1724,18 @@ function tidy(d){
     const y=d.sync;
     y.pending = Array.isArray(y.pending)
       ? y.pending.filter(x=>x && typeof x==='object' && typeof x.id==='string'
-                           && (x.kind==='join'||x.kind==='leave'))
-                 .map(x=>{ if(x.kind==='leave')
+                           && ['join','leave','title','move'].indexOf(x.kind)>=0)
+                 .map(x=>{ if(x.kind==='leave'||x.kind==='title')
                              x.places = Array.isArray(x.places)
                                ? x.places.filter(q=>q&&typeof q==='object') : [];
+                           if(x.kind==='move' && (!x.from || typeof x.from!=='object'))
+                             x.from={where:'',slot:''};
                            return x; })
+                 .filter(x=>!(x.kind==='move' && !x.from))
       : [];
     y.log = Array.isArray(y.log) ? y.log.filter(x=>x && typeof x==='object').slice(0,120) : [];
+    if(!y.watch || typeof y.watch!=='object' || Array.isArray(y.watch)) y.watch={};
+    if(!y.seen || typeof y.seen!=='object' || Array.isArray(y.seen)) y.seen={};
     if(!y.map || typeof y.map!=='object' || Array.isArray(y.map)) y.map={};
     ['cols','loc','dept','role'].forEach(k=>{
       const v=y.map[k];
@@ -3190,6 +3210,8 @@ function syncState(){
   const s=DATA.sync;
   if(!Array.isArray(s.pending)) s.pending=[];
   if(!Array.isArray(s.log)) s.log=[];
+  if(!s.watch || typeof s.watch!=='object' || Array.isArray(s.watch)) s.watch={};
+  if(!s.seen || typeof s.seen!=='object' || Array.isArray(s.seen)) s.seen={};
   if(!s.map || typeof s.map!=='object' || Array.isArray(s.map)) s.map={};
   ['cols','loc','dept','role'].forEach(k=>{
     if(!s.map[k] || typeof s.map[k]!=='object' || Array.isArray(s.map[k])) s.map[k]={};
@@ -3273,9 +3295,9 @@ function syncPeople(rows, cols){
    Slots can hold several comma-separated people, so expand them. */
 function directoryHolders(){
   const out=[];
-  const add=(where,slot,o)=>{
+  const add=(where,slot,o,ref)=>{
     slotPeople(o).forEach(p=>{
-      if(p.name) out.push({where, slot, name:p.name, email:normMail(p.email)});
+      if(p.name) out.push({where, slot, ref, name:p.name, title:p.title||'', email:normMail(p.email)});
     });
   };
   const SLOT={pis:'PI', crm:'Clinical Research Manager', lead:'Site lead',
@@ -3283,17 +3305,18 @@ function directoryHolders(){
               head:'Department lead', people:'Team member'};
   (DATA.sites||[]).forEach(s=>{
     const w=String(s.city||'').trim();
-    ['crm','lead','backup'].forEach(k=>add(w, SLOT[k], s[k]));
-    (s.pis||[]).forEach(p=>add(w, SLOT.pis, p));
-    (s.team||[]).forEach(p=>add(w, SLOT.team, p));
+    ['crm','lead','backup'].forEach(k=>add(w, SLOT[k], s[k], 'site:'+s.id+'/'+k));
+    (s.pis||[]).forEach(p=>add(w, SLOT.pis, p, 'site:'+s.id+'/pis'));
+    (s.team||[]).forEach(p=>add(w, SLOT.team, p, 'site:'+s.id+'/team'));
   });
   (DATA.depts||[]).forEach(d=>{
     const w=String(d.name||'').trim();
-    add(w, SLOT.head, d.head);
-    (d.team||[]).forEach(p=>add(w, SLOT.team, p));
+    add(w, SLOT.head, d.head, 'dept:'+d.id+'/head');
+    (d.team||[]).forEach(p=>add(w, SLOT.team, p, 'dept:'+d.id+'/team'));
   });
   (DATA.admins||[]).forEach(a=>{
-    if(a.name) out.push({where:'Admin team', slot:'Member', name:a.name, email:normMail(a.email)});
+    if(a.name) out.push({where:'Admin team', slot:'Member', ref:'admin',
+                         name:a.name, title:a.title||'', email:normMail(a.email)});
   });
   return out;
 }
@@ -3320,7 +3343,7 @@ function syncDiff(people){
      only a person with no live row at all has actually gone. */
   const byPerson=new Map();
   people.forEach(p=>{
-    const key = p.email || normName(p.name);
+    const key = personKey(p);
     if(!key) return;
     const prev=byPerson.get(key);
     if(!prev){ byPerson.set(key, p); return; }
@@ -3337,15 +3360,103 @@ function syncDiff(people){
         places: held.map(h=>({where:h.where, slot:h.slot}))
       });
     } else if(p.state==='here'){
-      if(!held.length) out.push({
-        id:'jn-'+Math.random().toString(36).slice(2,9), kind:'join',
-        name:p.name, email:p.email, title:p.title, loc:p.loc, dept:p.dept,
-        target: guessTarget(p), remember:true
-      });
+      if(!held.length){
+        out.push({
+          id:'jn-'+rnd(), kind:'join',
+          name:p.name, email:p.email, title:p.title, loc:p.loc, dept:p.dept,
+          target: guessTarget(p), remember:true
+        });
+      } else {
+        const t=titleChange(p, held); if(t) out.push(t);
+        const m=siteMove(p, held);    if(m) out.push(m);
+      }
     }
     /* 'away' and 'unknown' are deliberately left alone. */
   });
   return out;
+}
+
+const rnd = () => Math.random().toString(36).slice(2,9);
+/* Compare titles the way a person would: case and spacing are not a change. */
+const flatTitle = v => normName(String(v||'').replace(/[.,\-–—\/()]+/g,' '));
+const sameTitle = (a,b) => flatTitle(a)===flatTitle(b);
+
+/* A new job title in Paychex.
+
+   Someone can hold different titles in different places on purpose — the
+   directory has one person as "Medical Director" at five sites and
+   "Clinical Research Manager - TX" at a sixth. Overwriting all of them from
+   one payroll field would flatten that, so when the titles here disagree
+   nothing is ticked and the reviewer picks. When they already agree, the
+   change is unambiguous and every place is ticked. */
+function titleChange(p, held){
+  const watch=syncState().watch||{};
+  if(watch.title===false) return null;
+  const to=String(p.title||'').trim();
+  if(!to) return null;
+  const places=held.filter(h=>h.ref!=='admin' || true)
+                   .map(h=>({where:h.where, slot:h.slot, ref:h.ref, title:h.title||''}));
+  if(!places.length) return null;
+  if(places.every(x=>sameTitle(x.title,to))) return null;     /* already right */
+  const current=[...new Set(places.map(x=>normName(x.title)))];
+  const agreed = current.length===1;
+  return { id:'ti-'+rnd(), kind:'title', name:p.name, email:p.email, to,
+           agreed, places: places.map(x=>Object.assign({pick:agreed}, x)) };
+}
+
+/* A move to another site.
+
+   A move is a change over time, not a disagreement between two systems.
+   The directory is organised by PI and payroll by physical location, so
+   "Paychex says Southfield, the directory says Dr. Heidi Shea" is not a
+   transfer — it is simply two different ways of filing the same person, and
+   treating it as a transfer would flag half the organisation at once.
+
+   So this compares each roster against the last one, not against the
+   directory. Only a person whose own Paychex location actually changed since
+   we last looked has moved. The first roster you ever read proposes none,
+   because there is nothing yet to compare it with.
+
+   Still only when the directory has them in exactly one place: someone
+   listed at five sites has five real jobs, and payroll records one
+   location, so there is nothing safe to infer. */
+function siteMove(p, held){
+  const s=syncState();
+  if((s.watch||{}).move===false) return null;
+  if(held.length!==1) return null;
+  const was=(s.seen||{})[personKey(p)];
+  if(!was) return null;                             /* never seen before */
+  const movedLoc  = normName(was.loc||'')  !== normName(p.loc||'');
+  const movedDept = normName(was.dept||'') !== normName(p.dept||'');
+  if(!movedLoc && !movedDept) return null;          /* payroll has not moved them */
+  const m=s.map;
+  const to = (p.loc  && m.loc[normName(p.loc)])
+          || (p.loc  && teamRef(p.loc))
+          || (p.dept && m.dept[normName(p.dept)])
+          || (p.dept && teamRef(p.dept)) || '';
+  if(!to) return null;                              /* nowhere here to point at */
+  const at=String(held[0].ref||'').split('/')[0];
+  if(!at || at===to) return null;                   /* already there */
+  const slot=String(held[0].ref||'').split('/')[1]||'team';
+  const keep = to.startsWith('site:')===at.startsWith('site:') ? slot : 'team';
+  return { id:'mv-'+rnd(), kind:'move', name:p.name, email:p.email,
+           loc:p.loc, dept:p.dept,
+           wasLoc:was.loc||'', wasDept:was.dept||'',
+           from:{where:held[0].where, slot:held[0].slot},
+           target: to+'/'+keep, remember:true };
+}
+
+const personKey = p => p.email || normName(p.name);
+
+/* Remember where payroll had each person, so the next roster can tell a
+   real move from the usual difference in filing. */
+function recordSeen(people){
+  const s=syncState();
+  if(!s.seen || typeof s.seen!=='object' || Array.isArray(s.seen)) s.seen={};
+  people.forEach(p=>{
+    const k=personKey(p);
+    if(k) s.seen[k]={loc:p.loc||'', dept:p.dept||''};
+  });
 }
 
 /* Where a new joiner probably belongs, from what we were told last time. */
@@ -3457,6 +3568,75 @@ function addToTarget(ref, person){
   return label+' — '+slot;
 }
 
+/* Read and write one person's title inside a slot that may hold several,
+   keeping the comma lists lined up with each other. */
+function titleIn(o, name){
+  const p=slotPeople(o).find(x=>normName(x.name)===normName(name));
+  return p ? (p.title||'') : '';
+}
+function setTitleIn(o, name, title){
+  if(!o || !o.name) return false;
+  const cut=v=>String(v||'').split(',').map(x=>x.trim());
+  const names=cut(o.name);
+  const i=names.findIndex(x=>normName(x)===normName(name));
+  if(i<0) return false;
+  if(names.length===1){ o.title=title; return true; }
+  const t=cut(o.title); while(t.length<names.length) t.push('');
+  t[i]=title; o.title=t.join(', ');
+  return true;
+}
+
+/* The slot object a ref points at, resolved fresh so an edit made in the
+   meantime cannot send a change to the wrong place. */
+function slotAt(ref){
+  const [place, slot]=String(ref||'').split('/');
+  const [kind, id]=String(place||'').split(':');
+  const host = kind==='site' ? (DATA.sites||[]).find(s=>s.id===id)
+             : kind==='dept' ? (DATA.depts||[]).find(d=>d.id===id) : null;
+  if(!host) return null;
+  return (slot==='team'||slot==='pis') ? (host[slot]||[]) : host[slot];
+}
+
+function applyTitle(c){
+  const picks=(c.places||[]).filter(x=>x.pick);
+  if(!picks.length){ note('Tick at least one place to change.','err'); return false; }
+  let n=0;
+  picks.forEach(x=>{
+    if(x.ref==='admin'){
+      (DATA.admins||[]).forEach(a=>{
+        if(a && (normName(a.name)===normName(c.name) ||
+                 (c.email && normMail(a.email)===c.email))){ a.title=c.to; n++; }
+      });
+      return;
+    }
+    const t=slotAt(x.ref);
+    if(Array.isArray(t)) t.forEach(o=>{ if(setTitleIn(o, c.name, c.to)) n++; });
+    else if(t && setTitleIn(t, c.name, c.to)) n++;
+  });
+  if(!n){ note('Could not find those places any more — nothing changed.','err'); return false; }
+  syncLog(c.name+': title set to "'+c.to+'" in '+n+' place'+(n===1?'':'s'));
+  toast('Title updated in '+n+' place'+(n===1?'':'s'));
+  return true;
+}
+
+function applyMove(c){
+  if(!c.target){ note('Choose where '+c.name+' moves to first.','err'); return false; }
+  const holders=directoryHolders().filter(h=>
+    (c.email && h.email===c.email) || normName(h.name)===normName(c.name));
+  if(holders.length!==1){
+    note('They are in '+holders.length+' places now — move them by hand instead.','err');
+    return false;
+  }
+  const keep={name:c.name, title:holders[0].title||'', email:c.email||'', phone:''};
+  removeEverywhere(c.name, c.email);
+  const where=addToTarget(c.target, keep);
+  if(!where){ note('That place no longer exists — pick another.','err'); return false; }
+  if(c.remember) rememberMapping(c);
+  syncLog(c.name+' moved from '+c.from.where+' ('+c.from.slot+') to '+where);
+  toast(c.name+' moved to '+where);
+  return true;
+}
+
 function syncLog(what){
   const s=syncState();
   s.log.unshift({at:new Date().toISOString().slice(0,16).replace('T',' '), what});
@@ -3468,12 +3648,17 @@ function applyPending(id){
   const i=s.pending.findIndex(x=>x.id===id);
   if(i<0) return;
   const c=s.pending[i];
-  snapshot(c.kind==='leave' ? 'removing '+c.name : 'adding '+c.name);
+  const LABEL={leave:'removing ', join:'adding ', title:'that title change for ', move:'moving '};
+  snapshot((LABEL[c.kind]||'that change to ')+c.name);
   if(c.kind==='leave'){
     const touched=removeEverywhere(c.name, c.email);
     if(!touched.length){ note('Could not find '+c.name+' any more — nothing changed.','err'); return; }
     syncLog(c.name+' left Paychex — cleared from '+touched.join('; '));
     toast(c.name+' cleared from '+touched.length+' place'+(touched.length>1?'s':''));
+  } else if(c.kind==='title'){
+    if(!applyTitle(c)) return;
+  } else if(c.kind==='move'){
+    if(!applyMove(c)) return;
   } else {
     if(!c.target){ note('Choose where '+c.name+' goes first.','err'); return; }
     const where=addToTarget(c.target, c);
@@ -3557,6 +3742,49 @@ function paneSync(){
           <button class="btn btn-sm" data-pskip="${esc(c.id)}">Not now</button>
         </div>
       </div>`;
+    if(c.kind==='title'){
+      const n=(c.places||[]).filter(x=>x.pick).length;
+      return `
+      <div class="sync-c sync-ti" data-pid="${esc(c.id)}">
+        <div class="sync-h">
+          <div><p class="sync-n">${esc(c.name)}</p>
+               <p class="sync-s">Paychex now says <b>${esc(c.to)}</b></p></div>
+          <span class="sync-tag sync-tag-ti">Title</span>
+        </div>
+        <p class="sync-lab">${c.agreed
+          ? 'Listed the same way everywhere, so all of it is ticked.'
+          : '<b>Listed differently in different places.</b> Nothing is ticked — choose what should change.'}</p>
+        <ul class="sync-pk">${(c.places||[]).map((x,j)=>`
+          <li><label><input type="checkbox" data-ppick="${esc(c.id)}" data-j="${j}" ${x.pick?'checked':''}>
+            <span><b>${esc(x.where)}</b> — ${esc(x.slot)}<br>
+            <span class="sync-was">${x.title?'now: '+esc(x.title):'no title set'}</span></span></label></li>`).join('')}</ul>
+        <div class="sync-act">
+          <button class="btn btn-solid btn-sm" data-papply="${esc(c.id)}" ${n?'':'disabled'}>Change ${n||''} ${n===1?'place':'places'}</button>
+          <button class="btn btn-sm" data-pskip="${esc(c.id)}">Not now</button>
+        </div>
+      </div>`;
+    }
+    if(c.kind==='move'){
+      const [place,slot]=String(c.target||'').split('/');
+      return `
+      <div class="sync-c sync-mv" data-pid="${esc(c.id)}">
+        <div class="sync-h">
+          <div><p class="sync-n">${esc(c.name)}</p>
+               <p class="sync-s">Payroll moved them from <b>${esc(c.wasLoc||c.wasDept||'somewhere')}</b> to <b>${esc(c.loc||c.dept||'somewhere')}</b></p></div>
+          <span class="sync-tag sync-tag-mv">Moved</span>
+        </div>
+        <p class="sync-lab">The directory has them at <b>${esc(c.from.where)}</b> — ${esc(c.from.slot)}</p>
+        <div class="sync-tg">
+          <select data-pplace="${esc(c.id)}">${placeOptions(place||'')}</select>
+          <select data-pslot="${esc(c.id)}" ${place?'':'disabled'}>${slotOptions(place||'', slot||'')}</select>
+        </div>
+        <p class="sync-note">They come out of the old slot and go into this one. The old slot becomes an open post.</p>
+        <div class="sync-act">
+          <button class="btn btn-solid btn-sm" data-papply="${esc(c.id)}" ${place?'':'disabled'}>Move them</button>
+          <button class="btn btn-sm" data-pskip="${esc(c.id)}">Not now</button>
+        </div>
+      </div>`;
+    }
     const [place,slot]=String(c.target||'').split('/');
     return `
       <div class="sync-c sync-in" data-pid="${esc(c.id)}">
@@ -3597,8 +3825,17 @@ function paneSync(){
       </div>
     </div>` : '';
 
+  const titles=s.pending.filter(x=>x.kind==='title'), moves=s.pending.filter(x=>x.kind==='move');
+  const watch=s.watch||{};
+  const switches = `
+    <div class="sync-sw">
+      <label><input type="checkbox" data-watch="title" ${watch.title===false?'':'checked'}> Flag title changes</label>
+      <label><input type="checkbox" data-watch="move" ${watch.move===false?'':'checked'}> Flag site moves</label>
+      <span class="sync-swn">Payroll writes job titles its own way. If these fill up with differences that are not really changes, turn them off.</span>
+    </div>`;
+
   const queue = s.pending.length ? `
-    <p class="sync-count">${s.pending.length} waiting${leavers.length?` · ${leavers.length} leaving`:''}${joiners.length?` · ${joiners.length} new`:''}</p>
+    <p class="sync-count">${s.pending.length} waiting${leavers.length?` · ${leavers.length} leaving`:''}${joiners.length?` · ${joiners.length} new`:''}${titles.length?` · ${titles.length} title`:''}${moves.length?` · ${moves.length} moved`:''}</p>
     <div class="sync-list">${s.pending.map(card).join('')}</div>
     <div class="sync-act" style="margin-top:4px">
       <button class="btn btn-sm" id="syncClear">Clear the whole queue</button>
@@ -3622,9 +3859,33 @@ function paneSync(){
       </div>
       <button class="btn btn-solid btn-sm" id="syncPick">Choose a file</button>
     </div>
+    ${switches}
     ${colPicker}
     ${queue}
     ${log}`;
+
+  p.querySelectorAll('[data-watch]').forEach(el=>el.onchange=()=>{
+    const s2=syncState();
+    if(!s2.watch || typeof s2.watch!=='object') s2.watch={};
+    s2.watch[el.dataset.watch]=el.checked;
+    dirty();
+    if(!el.checked){
+      const kind = el.dataset.watch==='title' ? 'title' : 'move';
+      const n=s2.pending.filter(x=>x.kind===kind).length;
+      if(n){ s2.pending=s2.pending.filter(x=>x.kind!==kind);
+             syncLog('Stopped flagging '+(kind==='title'?'title changes':'site moves')+' — '+n+' dropped');
+             toast(n+' dropped from the queue'); }
+    }
+    renderAdmin(); renderBadge();
+  });
+  p.querySelectorAll('[data-ppick]').forEach(el=>el.onchange=()=>{
+    const c=syncState().pending.find(x=>x.id===el.dataset.ppick); if(!c) return;
+    const j=+el.dataset.j;
+    if(c.places && c.places[j]){ c.places[j].pick=el.checked; dirty();
+      const n=c.places.filter(x=>x.pick).length;
+      const go=p.querySelector(`[data-papply="${c.id}"]`);
+      if(go){ go.disabled=!n; go.textContent='Change '+(n||'')+' '+(n===1?'place':'places'); } }
+  });
 
   $('#syncPick').onclick=()=>{
     const inp=document.createElement('input'); inp.type='file';
@@ -3693,12 +3954,15 @@ function runDiff(){
   if(!people.length){ note('No people found in that file — check the column mapping.','err'); return; }
   const found=syncDiff(people);
   const known=people.filter(p=>p.state!=='unknown').length;
+  const first=!s.seen || !Object.keys(s.seen).length;
+  recordSeen(people);
   s.pending=found;
   SYNCFILE=null; SYNCHEAD=[];
   syncLog('Read a roster of '+people.length+' — '+found.length+' change'+(found.length===1?'':'s')+' to review');
   dirty(); renderAdmin(); renderBadge();
   if(!found.length) toast('Read '+people.length+' people — the directory already matches');
   else toast(found.length+' change'+(found.length===1?'':'s')+' to review');
+  if(first) note('First roster read — from the next one on, anyone payroll moves will be flagged too.');
   if(known<people.length) note((people.length-known)+' row'+(people.length-known===1?' had':'s had')+" a status I didn't recognise — those were left alone.");
 }
 
