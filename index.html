@@ -299,10 +299,10 @@ a{color:var(--navy)}
 /* ── Paychex sync ──────────────────────────────────────────────────────── */
 .btn:disabled,.btn[disabled]{opacity:.42;cursor:not-allowed;box-shadow:none}
 select:disabled{opacity:.5;cursor:not-allowed;background:#F4F7FB}
-#manageBtn{position:relative}
-.mbadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;
+.tcount{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;
   padding:0 5px;margin-left:7px;border-radius:9px;background:#C8102E;color:#fff;
-  font-family:var(--body);font-size:11px;font-weight:600;line-height:1;letter-spacing:0;vertical-align:middle}
+  font-size:10.5px;font-weight:600;line-height:1;letter-spacing:0;vertical-align:middle}
+.atab.on .tcount{background:#fff;color:#C8102E}
 .sync-top{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;
   flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid #E6ECF4;margin-bottom:18px}
 .sync-top .btn{flex:0 0 auto}
@@ -339,6 +339,14 @@ select:disabled{opacity:.5;cursor:not-allowed;background:#F4F7FB}
 .sync-lab{font-size:13px;color:#33465F;margin:0 0 8px}
 .sync-pl{margin:0 0 10px;padding-left:18px;font-size:13px;color:#33465F;line-height:1.7}
 .sync-note{font-size:12.5px;color:#5A6B82;margin:0 0 12px;line-height:1.5}
+.sync-fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.sync-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sync-f1{grid-column:1/-1}
+.sync-f label{font-size:11.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#8696AC}
+.sync-f input{width:100%;min-width:0}
+.sync-mail{display:none;font-size:12.5px;line-height:1.5;margin:0 0 12px;padding:8px 11px;
+  border-radius:9px;background:#FBF2E2;color:#7A5209}
+.sync-mail.on{display:block}
 .sync-tg{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .sync-tg select{flex:1 1 180px;min-width:0}
 .sync-rem{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#5A6B82;
@@ -352,6 +360,7 @@ select:disabled{opacity:.5;cursor:not-allowed;background:#F4F7FB}
 .sync-log li:last-child{border-bottom:0}
 .sync-log span{flex:0 0 108px;color:#8696AC;font-variant-numeric:tabular-nums;font-size:12px}
 @media(max-width:640px){
+  .sync-fg{grid-template-columns:1fr}
   .sync-top{flex-direction:column;align-items:stretch}
   .sync-log li{flex-direction:column;gap:2px}
   .sync-log span{flex:none}
@@ -1736,6 +1745,7 @@ function tidy(d){
     y.log = Array.isArray(y.log) ? y.log.filter(x=>x && typeof x==='object').slice(0,120) : [];
     if(!y.watch || typeof y.watch!=='object' || Array.isArray(y.watch)) y.watch={};
     if(!y.seen || typeof y.seen!=='object' || Array.isArray(y.seen)) y.seen={};
+    if(!y.link || typeof y.link!=='object' || Array.isArray(y.link)) y.link={};
     if(!y.map || typeof y.map!=='object' || Array.isArray(y.map)) y.map={};
     ['cols','loc','dept','role'].forEach(k=>{
       const v=y.map[k];
@@ -1821,7 +1831,7 @@ function renderGate(msg){
   renderAll();
 })();
 
-function renderAll(){ renderChips(); renderTabs(); renderPanel(); renderStamp(); renderDraft(); renderBadge(); }
+function renderAll(){ renderChips(); renderTabs(); renderPanel(); renderStamp(); renderDraft(); }
 
 /* Visible warning that what you're looking at is yours alone. */
 function renderDraft(){
@@ -2595,7 +2605,7 @@ function renderAdmin(){
   }
   $('.sheet-foot').style.display='';
   note(Store.status().t, Store.status().k==='ok'?'':(Store.status().k==='err'?'err':''));
-  const tabs=[['gaps','What\u2019s missing'],['sites','Sites'],['depts','Departments'],['people','Admin team'],['tasks','Quick tasks'],['sync','Paychex'+(pendingCount()?' \u00b7 '+pendingCount():'')],['settings','Settings']];
+  const tabs=[['gaps','What\u2019s missing'],['sites','Sites'],['depts','Departments'],['people','Admin team'],['tasks','Quick tasks'],['sync','Paychex'+(pendingCount()?'<span class="tcount">'+pendingCount()+'</span>':'')],['settings','Settings']];
   const st=Store.status();
   const banner = st.k==='ok' ? '' :
     `<div class="banner banner-${st.k==='err'?'warn':'warn'}">
@@ -3198,12 +3208,94 @@ const SYNC_COLS = [
   ['name',  'Full name',          /^(employee|worker)?\s*(full\s*)?name$/i],
   ['first', 'First name',         /\b(first|given)\b/i],
   ['last',  'Last name',          /\b(last|family|sur)\s*name\b/i],
+  ['empid', 'Employee ID',        /employee\s*(id|number|#)|^emp\s*id$/i],
   ['email', 'Email',              /e-?mail/i],
   ['status','Employment status',  /status/i],
   ['title', 'Job title',          /job\s*title|^title$|position/i],
   ['loc',   'Location',           /location|work\s*site|^site$/i],
   ['dept',  'Department',         /department|organi[sz]ation|cost\s*cent/i],
 ];
+
+/* Payroll writes a name back to front — "Fuhr, Noelle M" — and the directory
+   writes it the way people say it. Turn one into the other, dropping a
+   trailing middle initial, which payroll carries and the directory does not. */
+/* This is not only tidiness. A comma inside a name means two people sharing
+   one slot everywhere else in this directory, so "Fuhr, Noelle" written in
+   as-is would become two staff called "Fuhr" and "Noelle". Every name that
+   arrives from payroll is turned round and stripped of commas before it can
+   reach anything. */
+const NAME_SUFFIX=/\s(jr|sr|ii|iii|iv|md|do|phd|rn|np|pa|esq)\.?$/i;
+function flipName(v){
+  const s=String(v||'').trim();
+  const plain = x => x.replace(/,/g,' ').replace(/\s+/g,' ').trim();
+  if(s.indexOf(',')<0) return plain(s);
+  const last = s.slice(0, s.indexOf(',')).trim();
+  let rest   = s.slice(s.indexOf(',')+1).trim();
+  if(!last || !rest) return plain(s);
+  let suffix='';
+  const m=NAME_SUFFIX.exec(rest);
+  if(m){ suffix=' '+m[0].trim(); rest=rest.slice(0,m.index).trim(); }
+  const first=rest.replace(/\s+[A-Za-z]\.?$/,'').trim() || rest;   /* drop a middle initial */
+  return plain(first+' '+last+suffix);
+}
+
+/* Payroll files carry placeholder staff — a "DO NOT USE" record kept to hold
+   a slot open. They are not people and must never reach the directory. */
+const PLACEHOLDER=/\bdo\s*not\s*use\b|^test\b|\btest\s+(employee|user)\b|^(n\/a|none|unknown|xxx)$/i;
+const isPlaceholder = (name, id) =>
+  PLACEHOLDER.test(String(name||'').trim()) || /^9{4,}$/.test(String(id||'').trim());
+
+/* A file with no header row at all. Payroll reports often come this way, so
+   decide by what the first row holds rather than trusting it to be labels. */
+function hasHeader(rows){
+  const r=rows[0]||[];
+  const looksLikeData = v => {
+    const s=String(v||'').trim();
+    if(!s) return false;
+    return /^\d{3,12}$/.test(s)                              /* an id        */
+        || /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(s)     /* a date       */
+        || /@/.test(s)                                       /* an address   */
+        || /^(active|terminated|inactive|leave of absence)$/i.test(s);
+  };
+  return !r.some(looksLikeData);
+}
+
+/* With no labels to read, work out what each column is from what is in it. */
+function guessByContent(rows){
+  const body=rows.filter(r=>r.some(x=>String(x).trim()));
+  const n=Math.max(...body.map(r=>r.length));
+  const share=(vals,re)=> vals.length ? vals.filter(v=>re.test(v)).length/vals.length : 0;
+  const cols=[];
+  for(let i=0;i<n;i++){
+    const v=body.map(r=>String(r[i]||'').trim()).filter(Boolean);
+    cols.push({ i, v, uniq:new Set(v).size,
+      mail:   share(v,/@/),
+      status: share(v,/^(active|terminated|inactive|leave|loa|former)/i),
+      id:     share(v,/^\d{3,12}$/),
+      date:   share(v,/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/),
+      lastfirst: share(v,/^[^,]+,\s*\S/) });
+  }
+  const out={}, taken=new Set();
+  const take=(key, test, rank)=>{
+    const c=cols.filter(x=>!taken.has(x.i) && test(x)).sort(rank||((a,b)=>b.uniq-a.uniq))[0];
+    if(c){ out[key]='Column '+(c.i+1); taken.add(c.i); }
+  };
+  take('email',  c=>c.mail>.5);
+  take('status', c=>c.status>.8);
+  take('empid',  c=>c.id>.8);
+  take('name',   c=>c.lastfirst>.6 && c.uniq>1);
+  /* "Revival Research Institute, LLC - Cary", "... - Evans": one long shared
+     prefix across the column is how a location reads, and a job title does
+     not look like that. */
+  const prefix=v=>{
+    if(v.length<2) return 0;
+    let p=v[0];
+    v.forEach(x=>{ let i=0; while(i<p.length && i<x.length && p[i]===x[i]) i++; p=p.slice(0,i); });
+    return p.trim().length;
+  };
+  take('loc', c=>c.uniq>1 && prefix(c.v)>=8);
+  return out;
+}
 
 function syncState(){
   if(!DATA.sync || typeof DATA.sync!=='object' || Array.isArray(DATA.sync)) DATA.sync={};
@@ -3212,6 +3304,7 @@ function syncState(){
   if(!Array.isArray(s.log)) s.log=[];
   if(!s.watch || typeof s.watch!=='object' || Array.isArray(s.watch)) s.watch={};
   if(!s.seen || typeof s.seen!=='object' || Array.isArray(s.seen)) s.seen={};
+  if(!s.link || typeof s.link!=='object' || Array.isArray(s.link)) s.link={};
   if(!s.map || typeof s.map!=='object' || Array.isArray(s.map)) s.map={};
   ['cols','loc','dept','role'].forEach(k=>{
     if(!s.map[k] || typeof s.map[k]!=='object' || Array.isArray(s.map[k])) s.map[k]={};
@@ -3273,20 +3366,34 @@ function statusOf(v){
 
 /* Turn the sheet into people, using whichever columns were mapped. */
 function syncPeople(rows, cols){
-  const head=rows[0]||[], body=rows.slice(1);
-  const col=key=>{ const h=cols[key]; return h ? head.indexOf(h) : -1; };
+  const headed=hasHeader(rows);
+  const head=headed ? (rows[0]||[]) : [];
+  const body=headed ? rows.slice(1) : rows;
+  /* A labelled file is read by label; an unlabelled one by position. */
+  const col=key=>{
+    const h=cols[key]; if(!h) return -1;
+    const m=/^Column (\d+)$/.exec(h);
+    return m ? (+m[1]-1) : head.indexOf(h);
+  };
   const idx={}; SYNC_COLS.forEach(([k])=>idx[k]=col(k));
   const cell=(r,k)=> idx[k]>=0 ? String(r[idx[k]]||'').trim() : '';
-  return body.map(r=>{
+  const out=[]; let skipped=0;
+  body.forEach(r=>{
     let name=cell(r,'name');
     if(!name) name=[cell(r,'first'),cell(r,'last')].filter(Boolean).join(' ');
-    return { name,
-             email:  normMail(cell(r,'email')),
-             title:  cell(r,'title'),
-             loc:    cell(r,'loc'),
-             dept:   cell(r,'dept'),
-             state:  statusOf(cell(r,'status')) };
-  }).filter(p=>p.name || p.email);
+    name=flipName(name);
+    const empid=cell(r,'empid');
+    if(!name && !cell(r,'email')) return;
+    if(isPlaceholder(name, empid)){ skipped++; return; }
+    out.push({ name, empid,
+               email:  normMail(cell(r,'email')),
+               title:  cell(r,'title'),
+               loc:    cell(r,'loc'),
+               dept:   cell(r,'dept'),
+               state:  statusOf(cell(r,'status')) });
+  });
+  out.skipped=skipped;
+  return out;
 }
 
 /* ── who the directory already knows ─────────────────────────────────────── */
@@ -3325,6 +3432,14 @@ function directoryHolders(){
    people can share a name but not an address. A name match alone is good
    enough to recognise someone, never good enough to act on silently. */
 function heldBy(holders, p){
+  /* Someone added with a different address from the one payroll holds — a
+     work address typed in place of a personal one — is remembered, so the
+     next roster recognises them instead of offering them as a new hire. */
+  const link=(syncState().link||{})[personKey(p)];
+  if(link){
+    const by=holders.filter(h=>h.email===link || normName(h.name)===normName(link));
+    if(by.length) return by;
+  }
   if(p.email){
     const byMail=holders.filter(h=>h.email && h.email===p.email);
     if(byMail.length) return byMail;
@@ -3361,10 +3476,14 @@ function syncDiff(people){
       });
     } else if(p.state==='here'){
       if(!held.length){
+        const doms=workDomains();
         out.push({
           id:'jn-'+rnd(), kind:'join',
-          name:p.name, email:p.email, title:p.title, loc:p.loc, dept:p.dept,
-          target: guessTarget(p), remember:true
+          name:p.name, empid:p.empid||'', title:p.title, loc:p.loc, dept:p.dept,
+          match: p.email,                               /* for recognising them next time */
+          email: isWorkEmail(p.email, doms) ? p.email : '',   /* only a work address is published */
+          personal: !!(p.email && !isWorkEmail(p.email, doms)),
+          phone:'', target: guessTarget(p), remember:true
         });
       } else {
         const t=titleChange(p, held); if(t) out.push(t);
@@ -3377,6 +3496,35 @@ function syncDiff(people){
 }
 
 const rnd = () => Math.random().toString(36).slice(2,9);
+
+/* Work email.
+
+   Two different jobs get confused here, so keep them apart. Matching a
+   Paychex row to a person needs whatever address payroll holds, personal or
+   not — it is being used as an identifier. Publishing an address in a staff
+   directory is another matter: nobody's private mail belongs on a page the
+   whole organisation reads. So a personal address still matches, and is
+   still never written in.
+
+   What counts as a work address is taken from the directory itself: the
+   domains already in use here. It can be stated outright in the box on the
+   Paychex tab when the guess is wrong. */
+function workDomains(){
+  const set=(syncState().map.domains||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+  if(set.length) return set;
+  const count={};
+  directoryHolders().forEach(h=>{
+    const d=String(h.email||'').split('@')[1];
+    if(d) count[d]=(count[d]||0)+1;
+  });
+  return Object.keys(count).filter(d=>count[d]>=2);
+}
+function isWorkEmail(e, doms){
+  const d=String(e||'').split('@')[1];
+  if(!d) return false;
+  const list=doms||workDomains();
+  return list.length ? list.indexOf(d.toLowerCase())>=0 : true;
+}
 /* Compare titles the way a person would: case and spacing are not a change. */
 const flatTitle = v => normName(String(v||'').replace(/[.,\-–—\/()]+/g,' '));
 const sameTitle = (a,b) => flatTitle(a)===flatTitle(b);
@@ -3400,7 +3548,7 @@ function titleChange(p, held){
   if(places.every(x=>sameTitle(x.title,to))) return null;     /* already right */
   const current=[...new Set(places.map(x=>normName(x.title)))];
   const agreed = current.length===1;
-  return { id:'ti-'+rnd(), kind:'title', name:p.name, email:p.email, to,
+  return { id:'ti-'+rnd(), kind:'title', name:p.name, email:p.email, empid:p.empid||'', to, paychex:to,
            agreed, places: places.map(x=>Object.assign({pick:agreed}, x)) };
 }
 
@@ -3439,14 +3587,16 @@ function siteMove(p, held){
   if(!at || at===to) return null;                   /* already there */
   const slot=String(held[0].ref||'').split('/')[1]||'team';
   const keep = to.startsWith('site:')===at.startsWith('site:') ? slot : 'team';
-  return { id:'mv-'+rnd(), kind:'move', name:p.name, email:p.email,
+  return { id:'mv-'+rnd(), kind:'move', name:p.name, email:p.email, empid:p.empid||'',
            loc:p.loc, dept:p.dept,
            wasLoc:was.loc||'', wasDept:was.dept||'',
            from:{where:held[0].where, slot:held[0].slot},
            target: to+'/'+keep, remember:true };
 }
 
-const personKey = p => p.email || normName(p.name);
+/* Who this row is about. A payroll ID survives a change of name or address,
+   so prefer it; a file without one falls back to the address, then the name. */
+const personKey = p => (p.empid ? 'emp:'+String(p.empid).trim() : '') || p.email || normName(p.name);
 
 /* Remember where payroll had each person, so the next roster can tell a
    real move from the usual difference in filing. */
@@ -3549,7 +3699,11 @@ function addToTarget(ref, person){
   const host = kind==='site' ? (DATA.sites||[]).find(s=>s.id===id)
              : kind==='dept' ? (DATA.depts||[]).find(d=>d.id===id) : null;
   if(!host) return '';
-  const rec={name:person.name, title:person.title||'', email:person.email||'', phone:''};
+  /* One person, one name. A comma here would read as a second occupant of
+     the slot further down, so it never gets written even if it was typed. */
+  const rec={ name:flipName(person.name),
+              title:person.title||'', email:person.email||'', phone:person.phone||'' };
+  if(!rec.name) return '';
   const label = kind==='site' ? String(host.city||'').trim() : String(host.name||'').trim();
   if(slot==='team' || slot==='pis'){
     if(!Array.isArray(host[slot])) host[slot]=[];
@@ -3664,7 +3818,10 @@ function applyPending(id){
     const where=addToTarget(c.target, c);
     if(!where){ note('That place no longer exists — pick another.','err'); return; }
     if(c.remember) rememberMapping(c);
-    syncLog(c.name+' joined — added to '+where);
+    const key=(c.empid?'emp:'+c.empid:'') || c.match || normName(c.name);
+    const as =normMail(c.email) || normName(c.name);
+    if(key && as && key!==as) syncState().link[key]=as;
+    syncLog(c.name+' joined — added to '+where+(c.email?'':' (no work email yet)'));
     toast(c.name+' added to '+where);
   }
   s.pending.splice(i,1);
@@ -3687,7 +3844,7 @@ function skipPending(id){
   if(i<0) return;
   syncLog('Skipped: '+s.pending[i].name+' ('+s.pending[i].kind+')');
   s.pending.splice(i,1);
-  dirty(); renderAdmin(); renderBadge();
+  dirty(); renderAdmin();
 }
 
 /* ── the panel ───────────────────────────────────────────────────────────── */
@@ -3748,9 +3905,11 @@ function paneSync(){
       <div class="sync-c sync-ti" data-pid="${esc(c.id)}">
         <div class="sync-h">
           <div><p class="sync-n">${esc(c.name)}</p>
-               <p class="sync-s">Paychex now says <b>${esc(c.to)}</b></p></div>
+               <p class="sync-s">Paychex now says <b>${esc(c.paychex||c.to)}</b></p></div>
           <span class="sync-tag sync-tag-ti">Title</span>
         </div>
+        <div class="sync-f sync-f1"><label>Write it in the directory as</label>
+          <input data-pf="to" data-id="${esc(c.id)}" value="${esc(c.to||'')}"></div>
         <p class="sync-lab">${c.agreed
           ? 'Listed the same way everywhere, so all of it is ticked.'
           : '<b>Listed differently in different places.</b> Nothing is ticked — choose what should change.'}</p>
@@ -3790,10 +3949,24 @@ function paneSync(){
       <div class="sync-c sync-in" data-pid="${esc(c.id)}">
         <div class="sync-h">
           <div><p class="sync-n">${esc(c.name)}</p>
-               <p class="sync-s">${esc(c.title||'No job title given')}</p></div>
+               <p class="sync-s">Paychex says${c.loc?` <b>${esc(c.loc)}</b>`:''}${c.dept?`${c.loc?' · ':' '}<b>${esc(c.dept)}</b>`:''}${(!c.loc&&!c.dept)?' nothing about where they sit':''}</p></div>
           <span class="sync-tag sync-tag-in">New</span>
         </div>
-        <p class="sync-lab">Paychex says${c.loc?` <b>${esc(c.loc)}</b>`:''}${c.dept?` · <b>${esc(c.dept)}</b>`:''}${(!c.loc&&!c.dept)?' nothing about where they sit':''}</p>
+        <p class="sync-lab">Anything payroll got wrong or left blank, fix it here before you add them.</p>
+        <div class="sync-fg">
+          <div class="sync-f"><label>Name</label>
+            <input data-pf="name" data-id="${esc(c.id)}" value="${esc(c.name||'')}"></div>
+          <div class="sync-f"><label>Job title</label>
+            <input data-pf="title" data-id="${esc(c.id)}" value="${esc(c.title||'')}" placeholder="not given"></div>
+          <div class="sync-f"><label>Work email</label>
+            <input data-pf="email" data-id="${esc(c.id)}" value="${esc(c.email||'')}" placeholder="name@yourdomain.com"></div>
+          <div class="sync-f"><label>Phone</label>
+            <input data-pf="phone" data-id="${esc(c.id)}" value="${esc(c.phone||'')}" placeholder="optional"></div>
+        </div>
+        <p class="sync-mail ${c.email?'':'on'}" data-pmail="${esc(c.id)}">${
+          c.personal
+            ? 'Payroll has a personal address for them, which does not belong in the directory. Type their work email, or leave it blank for now.'
+            : 'Payroll has no work email for them. Type one, or leave it blank for now.'}</p>
         <div class="sync-tg">
           <select data-pplace="${esc(c.id)}">${placeOptions(place||'')}</select>
           <select data-pslot="${esc(c.id)}" ${place?'':'disabled'}>${slotOptions(place||'', slot||'')}</select>
@@ -3801,7 +3974,8 @@ function paneSync(){
         <label class="sync-rem"><input type="checkbox" data-prem="${esc(c.id)}" ${c.remember!==false?'checked':''}>
           Remember this, so the next person from ${esc(c.loc||c.dept||'there')} goes to the same place</label>
         <div class="sync-act">
-          <button class="btn btn-solid btn-sm" data-papply="${esc(c.id)}" ${place?'':'disabled'}>Add them</button>
+          <button class="btn btn-solid btn-sm" data-papply="${esc(c.id)}" ${place?'':'disabled'}>${
+            c.email?'Add them':'Add them without an email'}</button>
           <button class="btn btn-sm" data-pskip="${esc(c.id)}">Not now</button>
         </div>
       </div>`;
@@ -3816,7 +3990,8 @@ function paneSync(){
           <div class="f"><label>${esc(label)}</label>
             <select data-col="${esc(k)}">
               <option value="">— not in this file —</option>
-              ${SYNCHEAD.map(h=>`<option value="${esc(h)}" ${cols[k]===h?'selected':''}>${esc(h)}</option>`).join('')}
+              ${SYNCHEAD.map((h,ci)=>`<option value="${esc(h)}" ${cols[k]===h?'selected':''}>${
+                esc(h)}${SYNCSAMPLE[ci]?'  \u2014  '+esc(String(SYNCSAMPLE[ci]).slice(0,28)):''}</option>`).join('')}
             </select></div>`).join('')}
       </div>
       <div class="sync-act" style="margin-top:14px">
@@ -3859,6 +4034,11 @@ function paneSync(){
       </div>
       <button class="btn btn-solid btn-sm" id="syncPick">Choose a file</button>
     </div>
+    <div class="sync-f sync-f1" style="margin-bottom:16px">
+      <label>Work email domains</label>
+      <input id="syncDoms" value="${esc(s.map.domains||'')}" placeholder="${esc(workDomains().join(', ')||'none found yet')}">
+      <span class="sync-swn">Only addresses on these go into the directory. A personal address still recognises the person, it is just never published. Leave blank and the domains already in use here are assumed.</span>
+    </div>
     ${switches}
     ${colPicker}
     ${queue}
@@ -3876,7 +4056,7 @@ function paneSync(){
              syncLog('Stopped flagging '+(kind==='title'?'title changes':'site moves')+' — '+n+' dropped');
              toast(n+' dropped from the queue'); }
     }
-    renderAdmin(); renderBadge();
+    renderAdmin();
   });
   p.querySelectorAll('[data-ppick]').forEach(el=>el.onchange=()=>{
     const c=syncState().pending.find(x=>x.id===el.dataset.ppick); if(!c) return;
@@ -3901,8 +4081,9 @@ function paneSync(){
   p.querySelectorAll('[data-col]').forEach(el=>el.onchange=()=>{
     const m=syncState().map; m.cols[el.dataset.col]=el.value; dirty();
   });
+  const dm=$('#syncDoms'); if(dm) dm.oninput=()=>{ syncState().map.domains=dm.value; dirty(); };
   const run=$('#syncRun'); if(run) run.onclick=()=>runDiff();
-  const can=$('#syncCancel'); if(can) can.onclick=()=>{ SYNCFILE=null; SYNCHEAD=[]; renderAdmin(); };
+  const can=$('#syncCancel'); if(can) can.onclick=()=>{ SYNCFILE=null; SYNCHEAD=[]; SYNCSAMPLE=[]; renderAdmin(); };
 
   p.querySelectorAll('[data-pplace]').forEach(el=>el.onchange=()=>{
     const c=syncState().pending.find(x=>x.id===el.dataset.pplace); if(!c) return;
@@ -3917,6 +4098,30 @@ function paneSync(){
     const place=String(c.target||'').split('/')[0];
     if(place){ c.target=place+'/'+el.value; dirty(); }
   });
+  p.querySelectorAll('[data-pf]').forEach(el=>el.oninput=()=>{
+    const c=syncState().pending.find(x=>x.id===el.dataset.id); if(!c) return;
+    const k=el.dataset.pf;
+    c[k]= k==='email' ? normMail(el.value) : el.value;
+    dirty();
+    if(k==='email'){
+      const warn=p.querySelector(`[data-pmail="${c.id}"]`);
+      const go  =p.querySelector(`[data-papply="${c.id}"]`);
+      const v=normMail(el.value);
+      if(warn){
+        warn.classList.toggle('on', !v || !isWorkEmail(v));
+        if(v && !isWorkEmail(v))
+          warn.textContent='That is not one of your work domains ('+(workDomains().join(', ')||'none set')+'). It will still be saved if you mean it.';
+        else if(!v)
+          warn.textContent='No work email yet. You can add one later in Sites or Departments.';
+      }
+      if(go) go.textContent = v ? 'Add them' : 'Add them without an email';
+    }
+    if(k==='to'){
+      const n=(c.places||[]).filter(x=>x.pick).length;
+      const go=p.querySelector(`[data-papply="${c.id}"]`);
+      if(go) go.disabled = !n || !String(el.value).trim();
+    }
+  });
   p.querySelectorAll('[data-prem]').forEach(el=>el.onchange=()=>{
     const c=syncState().pending.find(x=>x.id===el.dataset.prem); if(c){ c.remember=el.checked; dirty(); }
   });
@@ -3925,25 +4130,33 @@ function paneSync(){
   const cl=$('#syncClear'); if(cl) cl.onclick=()=>{
     if(cl.dataset.armed){ const n=syncState().pending.length;
       syncState().pending=[]; syncLog('Queue cleared ('+n+' change'+(n===1?'':'s')+' dropped)');
-      dirty(); renderAdmin(); renderBadge(); toast('Queue cleared'); }
+      dirty(); renderAdmin(); toast('Queue cleared'); }
     else { cl.dataset.armed='1'; cl.textContent='Drop them all?';
       setTimeout(()=>{ if(cl.isConnected){ delete cl.dataset.armed; cl.textContent='Clear the whole queue'; } },3500); }
   };
 }
 
-let SYNCFILE=null, SYNCHEAD=[];
+let SYNCFILE=null, SYNCHEAD=[], SYNCSAMPLE=[];
 
 function loadRoster(text){
   const rows=csvRows(text);
-  if(rows.length<2){ note("That file has no rows I can read.",'err'); return; }
-  SYNCFILE=rows; SYNCHEAD=rows[0];
+  if(!rows.length){ note("That file has no rows I can read.",'err'); return; }
+  const headed=hasHeader(rows);
+  SYNCFILE=rows;
+  SYNCHEAD = headed ? rows[0] : rows[0].map((_,i)=>'Column '+(i+1));
+  SYNCSAMPLE = headed ? (rows[1]||[]) : rows[0];
   const s=syncState();
   const have=s.map.cols||{};
   const usable=SYNCHEAD.length && Object.values(have).some(v=>v && SYNCHEAD.includes(v));
-  if(!usable) s.map.cols=guessCols(SYNCHEAD);
+  if(!usable) s.map.cols = headed ? guessCols(SYNCHEAD) : guessByContent(rows);
   /* If the guess found both of the fields that matter, go straight to the diff. */
   const c=s.map.cols;
-  if(c.status && (c.email || c.name || (c.first&&c.last))) runDiff();
+  const enough = c.status && (c.email || c.name || (c.first&&c.last));
+  /* An unlabelled file is confirmed once, with a sample of each column to go
+     by. After that the choice is remembered and later files run straight
+     through. */
+  if(enough && (headed || usable)) runDiff();
+  else if(enough) { note('No column headings in that file — check I have read it right, then carry on.'); renderAdmin(); }
   else { note('Tell me which column is which and I will take it from there.'); renderAdmin(); }
 }
 
@@ -3957,25 +4170,20 @@ function runDiff(){
   const first=!s.seen || !Object.keys(s.seen).length;
   recordSeen(people);
   s.pending=found;
-  SYNCFILE=null; SYNCHEAD=[];
+  SYNCFILE=null; SYNCHEAD=[]; SYNCSAMPLE=[];
   syncLog('Read a roster of '+people.length+' — '+found.length+' change'+(found.length===1?'':'s')+' to review');
-  dirty(); renderAdmin(); renderBadge();
+  dirty(); renderAdmin();
   if(!found.length) toast('Read '+people.length+' people — the directory already matches');
   else toast(found.length+' change'+(found.length===1?'':'s')+' to review');
   if(first) note('First roster read — from the next one on, anyone payroll moves will be flagged too.');
+  if(people.skipped) note(people.skipped+' placeholder record'+(people.skipped===1?'':'s')+" in that file (a \u201cDO NOT USE\u201d or similar) \u2014 left out.");
   if(known<people.length) note((people.length-known)+' row'+(people.length-known===1?' had':'s had')+" a status I didn't recognise — those were left alone.");
 }
 
-/* ── the count on the Manage button ──────────────────────────────────────── */
-function renderBadge(){
-  const b=$('#manageBtn'); if(!b) return;
-  const n=pendingCount();
-  let dot=b.querySelector('.mbadge');
-  if(!n){ if(dot) dot.remove(); b.removeAttribute('title'); return; }
-  if(!dot){ dot=document.createElement('span'); dot.className='mbadge'; b.appendChild(dot); }
-  dot.textContent = n>9 ? '9+' : String(n);
-  b.title = n+' change'+(n===1?'':'s')+' from Paychex waiting for you';
-}
+/* No count on the Manage button on purpose. Everyone reading the directory
+   sees that button, and a badge on it reads as an alert aimed at them when
+   only an admin can act on it. The count lives on the Paychex tab inside
+   Manage, and reaches you by email. */
 
 function paneSet(){
   const c=DATA.config;
