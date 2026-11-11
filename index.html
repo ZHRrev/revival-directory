@@ -339,6 +339,23 @@ select:disabled{opacity:.5;cursor:not-allowed;background:#F4F7FB}
 .sync-lab{font-size:13px;color:#33465F;margin:0 0 8px}
 .sync-pl{margin:0 0 10px;padding-left:18px;font-size:13px;color:#33465F;line-height:1.7}
 .sync-note{font-size:12.5px;color:#5A6B82;margin:0 0 12px;line-height:1.5}
+.pcx-steps{list-style:none;margin:12px 0 0;padding:0;font-size:13px;line-height:1.55}
+.pcx-steps li{padding:7px 0 7px 22px;position:relative;border-bottom:1px solid #F0F4F9}
+.pcx-steps li:last-child{border-bottom:0}
+.pcx-steps li:before{position:absolute;left:0;top:7px;font-weight:700}
+.pcx-ok{color:#116370}
+.pcx-ok:before{content:'\2713';color:#1A7F8E}
+.pcx-bad{color:#9A0C23}
+.pcx-bad:before{content:'\2715';color:#C8102E}
+p.pcx-ok,p.pcx-bad{font-size:13.5px;line-height:1.5;margin:12px 0 0;padding:9px 12px;border-radius:9px}
+p.pcx-ok{background:#E6F4F6}
+p.pcx-bad{background:#FBEAED}
+p.pcx-ok:before,p.pcx-bad:before{content:none}
+.pcx-facts{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.7;color:#33465F}
+.pcx-facts b{color:var(--ink)}
+.pcx-pre{margin:10px 0 0;padding:12px;max-height:230px;overflow:auto;border-radius:9px;
+  background:#F4F7FB;border:1px solid #E6ECF4;font-family:var(--mono);font-size:11.5px;
+  line-height:1.6;color:#33465F;white-space:pre-wrap;word-break:break-all}
 .sync-fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .sync-f{display:flex;flex-direction:column;gap:4px;min-width:0}
 .sync-f1{grid-column:1/-1}
@@ -4068,6 +4085,12 @@ function paneSync(){
       </div>
       <button class="btn btn-solid btn-sm" id="syncPick">Choose a file</button>
     </div>
+    <div class="sync-box" id="pcxBox">
+      <p class="sync-bt">Paychex connection</p>
+      <p class="sec-note" style="margin:0 0 12px">Checks the two credentials on the server — whether they work, whether they are the right way round, and what a worker record looks like. Nothing secret is ever shown.</p>
+      <div class="sync-act"><button class="btn btn-sm" id="pcxTest">Test the connection</button></div>
+      <div id="pcxOut"></div>
+    </div>
     <div class="sync-f sync-f1" style="margin-bottom:16px">
       <label>Work email domains</label>
       <input id="syncDoms" value="${esc(s.map.domains||'')}" placeholder="${esc(workDomains().join(', ')||'none found yet')}">
@@ -4115,6 +4138,7 @@ function paneSync(){
   p.querySelectorAll('[data-col]').forEach(el=>el.onchange=()=>{
     const m=syncState().map; m.cols[el.dataset.col]=el.value; dirty();
   });
+  const pt=$('#pcxTest'); if(pt) pt.onclick=()=>runPaychexTest(pt);
   const dm=$('#syncDoms'); if(dm) dm.oninput=()=>{ syncState().map.domains=dm.value; dirty(); };
   const run=$('#syncRun'); if(run) run.onclick=()=>runDiff();
   const can=$('#syncCancel'); if(can) can.onclick=()=>{ SYNCFILE=null; SYNCHEAD=[]; SYNCSAMPLE=[]; renderAdmin(); };
@@ -4171,6 +4195,74 @@ function paneSync(){
 }
 
 let SYNCFILE=null, SYNCHEAD=[], SYNCSAMPLE=[];
+
+/* Ask the server to try the Paychex credentials. They live only in Netlify's
+   environment; this page never sees them and never sends them. */
+async function runPaychexTest(btn){
+  const out=$('#pcxOut'); if(!out) return;
+  if(Store.mode!=='proxy'){
+    out.innerHTML=`<p class="pcx-bad">This needs the Netlify function. Right now the directory is running in ${esc(Store.mode)} mode.</p>`;
+    return;
+  }
+  btn.disabled=true; const was=btn.textContent; btn.textContent='Checking…';
+  out.innerHTML='<p class="sec-note" style="margin:12px 0 0">Talking to Paychex. This can take a few seconds.</p>';
+  let r=null, err='';
+  try{
+    const res=await fetch(Store.endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-key':Store.adminKey||''},
+      body: JSON.stringify({action:'paychex-test'})
+    });
+    if(res.status===401) err='Sign in to Manage again — the session was lost.';
+    else if(res.status===400) err='This Netlify function is the older one. Upload the new directory.js and deploy, then try again.';
+    else r=await res.json();
+  }catch(e){ err='Could not reach the server. '+(e&&e.message||''); }
+  btn.disabled=false; btn.textContent=was;
+  if(err){ out.innerHTML=`<p class="pcx-bad">${esc(err)}</p>`; return; }
+  out.innerHTML=paychexReport(r||{});
+  const cp=$('#pcxCopy');
+  if(cp) cp.onclick=()=>{
+    const txt=JSON.stringify({recon:r.recon||null, fields:r.fields||[], sample:r.sample||null,
+                              host:r.host||'', swapped:!!r.swapped}, null, 2);
+    try{ navigator.clipboard.writeText(txt); toast('Copied — safe to paste, no names in it'); }
+    catch(e){ note('Could not copy. Select the text below instead.','err'); }
+  };
+}
+
+function paychexReport(r){
+  if(r.problem && !(r.steps||[]).length)
+    return `<p class="pcx-bad">${esc(r.problem)}</p>${r.hint?`<p class="sec-note" style="margin:8px 0 0">${esc(r.hint)}</p>`:''}`;
+  const rows=(r.steps||[]).map(s=>`
+    <li class="${s.ok?'pcx-ok':'pcx-bad'}"><b>${esc(s.step)}</b> — ${esc(s.detail||'')}
+      ${Array.isArray(s.companies)&&s.companies.length
+        ? `<br><span class="sync-was">${s.companies.map(c=>esc(c.name||c.id||'')).join(' · ')}</span>` : ''}</li>`).join('');
+  const verdict = r.swapped
+    ? `<p class="pcx-bad"><b>The two values are the wrong way round.</b> In Netlify, swap what is in PAYCHEX_KEY and PAYCHEX_SECRET, redeploy, and run this again.</p>`
+    : (r.ok ? `<p class="pcx-ok"><b>Connected.</b> The credentials are correct as set.</p>` : '');
+  const rc=r.recon||{};
+  const counts = rc.values ? Object.keys(rc.values).filter(k=>k!=='emailDomains').map(k=>
+      `<li><b>${esc(k)}</b> — ${esc(Object.entries(rc.values[k]).map(([v,n])=>v+' ×'+n).join(', '))}</li>`).join('') : '';
+  const doms = (rc.values&&rc.values.emailDomains)
+    ? Object.entries(rc.values.emailDomains).map(([d,n])=>esc(d)+' ×'+n).join(', ') : '';
+  const recon = rc.returned!==undefined ? `
+    <p class="sync-lab" style="margin-top:16px"><b>What came back</b></p>
+    <ul class="pcx-facts">
+      <li>${rc.returned} worker${rc.returned===1?'':'s'} in one call${rc.returned>=100?' (the most it was asked for — there are likely more)':''}</li>
+      <li>${rc.withAnyEmail} with an address on file, ${rc.withoutEmail} without${doms?` — ${doms}`:''}</li>
+      ${counts}
+      <li>response wrapped in: ${esc((rc.envelope||[]).join(', ')||'—')}</li>
+      ${Object.keys(rc.headers||{}).length?`<li>paging headers: ${esc(Object.keys(rc.headers).join(', '))}</li>`:''}
+    </ul>` : '';
+  const shape = (r.fields||[]).length
+    ? `${recon}
+       <p class="sync-lab" style="margin-top:14px">A worker record has ${r.fields.length} fields. Send all of this to Claude so the sync can be built right the first time — it is field names and counts, no people.</p>
+       <div class="sync-act"><button class="btn btn-sm" id="pcxCopy">Copy it</button></div>
+       <pre class="pcx-pre">${esc((r.fields||[]).join('\n'))}</pre>` : recon;
+  return `${verdict}<ul class="pcx-steps">${rows}</ul>
+    ${r.problem?`<p class="pcx-bad">${esc(r.problem)}</p>`:''}
+    ${r.hint?`<p class="sec-note">${esc(r.hint)}</p>`:''}
+    ${r.detail?`<p class="sync-was">${esc(r.detail)}</p>`:''}${shape}`;
+}
 
 function loadRoster(text){
   const rows=csvRows(text);
