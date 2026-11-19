@@ -89,6 +89,43 @@ a{color:var(--navy)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-size:13.5px;cursor:pointer;color:var(--ink);transition:all .14s;text-align:left}
 .chip:hover{border-color:var(--cyan);background:#F3FBFD;transform:translateY(-1px)}
+/* Quick tasks: "see all" chip, the all-questions view, and question rows */
+.chip-all{border-style:dashed;color:var(--navy);font-weight:600}
+.chip-all:hover{border-style:solid}
+.tq{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;row-gap:3px;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;cursor:pointer;margin-bottom:8px;
+  transition:border-color .14s, background .14s;font:inherit;color:var(--ink)}
+.tq:hover{border-color:var(--cyan);background:#F3FBFD}
+.tq-q{font-family:var(--display);font-weight:600;font-size:15px;line-height:1.3;grid-column:1}
+.tq-a{font-size:13px;color:var(--muted);line-height:1.45;grid-column:1}
+.tq-o{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);grid-column:1;margin-top:2px}
+.tq-go{grid-column:2;grid-row:1 / span 3;align-self:center;font-size:22px;color:var(--muted-2)}
+.tq mark{background:#D7F1F7;color:inherit;border-radius:3px;padding:0 1px}
+.tq-sec{margin:0 0 26px}
+.tq-sec h3{font-family:var(--display);font-size:15px;margin:0 0 10px;letter-spacing:-.01em}
+.tq-sec h3 span{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);font-weight:500;margin-left:6px}
+.tq-sec .tq-more{margin-top:2px}
+/* the view */
+.tasksall{position:fixed;inset:0;z-index:60;background:var(--bg,#F4F7FB);display:none;flex-direction:column}
+.tasksall.on{display:flex}
+.ta-head{background:var(--ink,#0A1D3B);color:#fff;padding:18px 0 20px}
+.ta-head .wrap{display:flex;flex-direction:column;gap:12px}
+.ta-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ta-top h2{font-family:var(--display);font-size:22px;margin:0;letter-spacing:-.015em}
+.ta-eye{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--halo,#8FD9E8)}
+.ta-count{font-size:13px;color:#B9C6D9}
+.ta-body{flex:1;overflow:auto;padding:22px 0 40px}
+.ta-gh{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin:18px 0 8px;font-weight:600}
+.ta-group:first-child .ta-gh{margin-top:0}
+body.noscroll{overflow:hidden}
+@media (max-width:560px){ .ta-top h2{font-size:19px} .tq{padding:11px 13px} }
+.tasksall .searchbox{margin-top:4px}
+#taq{width:100%;padding:14px 44px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#fff;font:inherit;font-size:15px;box-sizing:border-box}
+#taq::placeholder{color:#8FA3BF}
+#taq::-webkit-search-decoration,#taq::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+#taq:focus{background:rgba(255,255,255,.14);border-color:var(--halo,#8FD9E8);outline:none}
+.ta-group .tq-o{display:none}
+
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;margin-bottom:22px}
 .tabs::-webkit-scrollbar{display:none}
 .tab{position:relative;border:0;background:none;cursor:pointer;padding:12px 4px 14px;margin-right:20px;font-family:var(--display);font-weight:600;font-size:15px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:8px;letter-spacing:-.005em}
@@ -413,6 +450,8 @@ p.pcx-ok:before,p.pcx-bad:before{content:none}
 .tasked{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .tasked input{flex:1;min-width:170px;border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff}
 .tasked select{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff;max-width:250px}
+.tfront{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);white-space:nowrap;cursor:pointer}
+.tasked .tfront input{flex:none;min-width:0;width:auto;padding:0;margin:0;border:0}
 .iconbtn{border:1px solid var(--line);background:#fff;border-radius:7px;width:32px;height:32px;cursor:pointer;color:var(--muted);flex:none;line-height:1}
 /* Red is for removing something. Search, move, duplicate and the extra-fields
    toggle are not destructive, so they get a neutral hover. */
@@ -563,6 +602,32 @@ html.ocv-lock,html.ocv-lock body{overflow:hidden}
 .ocv-orgtools{display:inline-flex;gap:6px}
 .ocv-orgtools[hidden],#ocvOrg[hidden]{display:none}
 .admin-orgbtn{margin-top:16px}
+
+/* Manage → People on charts */
+.ocp-rule{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1.2fr) auto;gap:8px;align-items:center;margin-bottom:8px}
+.ocp-rule input,.ocp-rule select,.ocp-tools input[type=search]{min-width:0;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13.5px;background:var(--card);color:var(--ink)}
+.ocp-rule .ocp-hits{grid-column:2/-1;margin-top:-2px}
+.ocp-tools{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:6px 0 14px}
+.ocp-tools input[type=search]{flex:1 1 260px;width:auto}
+.ocp-only{display:flex;gap:7px;align-items:center;font-size:13.5px;color:var(--muted);cursor:pointer}
+.ocp-gh{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin:18px 0 8px;font-weight:600}
+.ocp-gh span{margin-left:6px;color:var(--muted-2);font-weight:400}
+.ocp .acc-h{flex-wrap:wrap}
+.ocp-under{margin-left:auto;font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ocp-under b{color:var(--ink);font-weight:600}
+.ocp-under em{color:var(--muted-2)}
+.ocp .caret{margin-left:6px !important}
+.ocp-badge{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:3px 7px;border-radius:999px;background:#E6F6FA;color:#0B5E7A;border:1px solid #BFE6EF}
+.ocp-rulebadge{background:#F1F4F9;color:var(--muted);border-color:var(--line)}
+.ocp-dir{margin:10px 0 4px}
+.ocp-show{display:flex;gap:10px;align-items:flex-start;margin:10px 0 2px;cursor:pointer}
+.ocp-show input{margin-top:3px}
+.ocp-show small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.ocp-now{margin:14px 0 0;padding:10px 12px;border-radius:8px;background:#F6F9FC;border:1px solid var(--line-soft);font-size:13.5px;color:var(--muted)}
+.ocp-now b{color:var(--ink)}
+.ocp-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+@media (max-width:560px){ .ocp-rule{grid-template-columns:1fr auto} .ocp-rule .ocm-to{grid-column:1/-1} .ocp-rule .ocp-hits{grid-column:1/-1} .ocp-under{margin-left:0;justify-content:flex-start;width:100%} }
+.ocp [hidden]{display:none !important}
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAFXklEQVR4nMRXe1BUVRj/nbuXBWTFDfFRgIrgG1FTJh6igI/GR+OjMa3R0cnxD2b6w5psmmKqsaQMS0ub6WGZk6U0U/7T0/LBIAmapoBCtCrr8toFFxdQlsfe23eO7mUX2oVtfPxm7tzvnvOd7/vu+R7nOzK8EB8cGj18MxhLg4ppjGEU7gJUFdfAcIGIovYa2y7A1OGeY24iJCYtnanq54yxcbiHUFX1H5WxjU5LUaFmQOgjKamQWCEplwIRNig8XLxvtbQEsowboUBR5rTXFRcxjEgMC9UbLjCwuECEjJ2egPW5rwp6/yvbcOV8eSDLycPq5fbOtmlSiGxY1Z/y+JnTMDk9GUzq2aD01csh6/XiSVm5RBvnPJw37tFEfyLBdXLdOr1x1Gb6nu6LcWpmGtZtfRmJGWno6uiEubxSjFsqqmAwGmGttuDXvQfQ3tomxueQYSteyMaMBRmoN1WjyVLr0wiKBatMEZrMGAaEEEOYRtvrGpC/7X2/PHJwEPxBIt26oCGjdpB+2RdTc72V/AU0XDGjMP8wOp0dfoXazBbogoJgOluKsz/9DsXl8smrMjzEBsWkqQgUkUPBRgwDi4ggZ1I4XW+Gam0Emq4jUPT5cx5U6U8tw5DICBz7+ju0NDb1WCzLkJJmQDe+V8zGjhYvV9VlKKfPgXn8tXHkcGSsWQFHox0FtINKd7d/AxIzUzF/wxpBS7SV3+ftuT0xbCjk2Slg4Qbx+fDgMGxKTkSMcTD2lpSh5Fq9MCx71SJsXToXkePnCb7HN64lmWmCbqqrQ9nxIv8G2K7VabTDatNoKW6MppzjpcwkPJuUIOg5sVGY8O4+rJ81BXnLMvHRDyc0vmYPGc0Njb3V9TWghtLr0+dzyAVDUV54Soyp+iDK2lgvvvnjRmv0SNqNF+fOQs68ZPxVZ0NOcSlUnU644uj+fDSaa0i5TcjujYEFYUwU5Kx0r6EVCfH45MkFCJZ1KLhcg9m0Cw7KkNQ9B1HfehPdvxwDPP7eF2QMAIwCqTcOl5twpMqM5VPi8OHyLDpKGNYd+lko55BojTIAA/ocPoYII5KWLkT4sMgeA3R9zygDuWXxxFh8sCwLMpXft4+V4OTVnqrH3eYGl8Vlug8vT/TZgezd78BIOd7mcGD76k2UNi4odgf0pOSJyWOxcuo4zIwegSiPgLxqb8H2E2e85Kh3agKjWHju4zyEDQnHXErHHWuz/Rsg0QIxIevhbheWkNLdWzZAT3PnKci4zwcH64VBHAVXLOgDKk7CAHKNWyavkP3uwDdb8zAmYRIslSataFz6sxRZb+xBTeggjW/h+NGaAZU2u5cMFz+AWloFzWUceG07oifGo7r0Uv8GWC5ViccTV821UOnPdYsXQDLe9mOXS9Hmzc09DYlyowVKYTE8z7fq0ovi+S/02wFFRkeJN+vqguvHI6LcioUeR2jTzXbx5nOch/N6rvUHv2m4aedbGDN1EsoL/sDBN98Do+1UT51Bd5UJ8qIMje9G0Wl0l1YIv7vNeub1LZhCjUl1WQU+o8LmCz53IJKKD1fOMTElCcFhPf7nioLszdqng+LFHXQcPJUnPDZT0FwGlxWwAbyTqSw+i452J879dgIdN295zYcE6zXapShec232G7h4sph6B6eQ4a8r8uuCr3Jyfc7pPVLK1euI5fg2dxcGAt6S/U3xNAEBoqzChNydXwi6te0W/g+E7tCY1EPUoa7GAwD1UvkSXRLO4wGB65acHd1fEt2A+w7V6uxU9kloPNOgKMpacV26X6pJl6Kwp2ErsYo0dNaeOkqXhAx+ccQ9xp3LaYaztug4/+51Jbn/1/N/AQAA//+TfwQgAAAABklEQVQDALceFbo8fi+xAAAAAElFTkSuQmCC">
 <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
@@ -620,6 +685,22 @@ html.ocv-lock,html.ocv-lock body{overflow:hidden}
     <div class="stamp" id="stamp"></div>
   </div>
 </footer>
+
+<div class="tasksall" id="tasksAll" role="dialog" aria-modal="true" aria-labelledby="taTitle">
+  <div class="ta-head"><div class="wrap">
+    <div class="ta-top">
+      <div><div class="ta-eye">I need help with…</div><h2 id="taTitle">Every question</h2></div>
+      <button class="btn btn-ghost btn-sm" id="taClose">Close</button>
+    </div>
+    <div class="searchbox">
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4"/></svg>
+      <input id="taq" type="search" autocomplete="off" placeholder="Search the questions and their answers" aria-label="Search the questions">
+      <button class="qclear" id="taqclear" aria-label="Clear search">×</button>
+    </div>
+    <div class="ta-count" id="taCount"></div>
+  </div></div>
+  <div class="ta-body"><div class="wrap" id="taList"></div></div>
+</div>
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drRole">
@@ -2021,16 +2102,92 @@ function resolve(ref){
   if(kind==='admin') return adm(id) && {kind, id, label:adm(id).name};
   return null;
 }
+/* ─── Quick tasks: a few on the front, the rest in their own view ─── */
+const TASK_FRONT = 6;   /* how many show on the front when none are picked in Manage */
+/* A task earns a place if it routes somewhere, or has a written answer or a link. */
+function taskUsable(t){
+  if(!t || !t.label) return false;
+  return !!((t.to && resolve(t.to)) || (t.answer||'').trim() || (t.link||'').trim());
+}
+function taskList(){ return (DATA.tasks||[]).map((t,i)=>({t,i})).filter(x=>taskUsable(x.t)); }
+/* The ones on the front page: those ticked "Front page" in Manage, or else the first few. */
+function frontTasks(){
+  const all=taskList(), picked=all.filter(x=>x.t.front);
+  return picked.length ? picked : all.slice(0, TASK_FRONT);
+}
+/* Who a task goes to, in words, for the list and for searching. */
+function taskOwner(t){
+  const r=t.to && resolve(t.to);
+  if(r) return r.label;
+  return (t.answer||'').trim() || (t.link||'').trim() ? 'Quick answer' : '';
+}
+/* Everything a person might type to find a task: the question, the written
+   answer, the link's name, who owns it and who to try if they're away. */
+function taskText(t){
+  const lk=(t.link||'').trim() ? (parseLinks(t.link)[0]||{}) : {};
+  return [t.label, t.answer, lk.label, taskOwner(t), t.fallback].filter(Boolean).join(' ').toLowerCase();
+}
+/* Every word typed has to appear somewhere, in any order. */
+function taskMatches(q){
+  const words=String(q||'').toLowerCase().split(/\s+/).filter(Boolean);
+  if(!words.length) return taskList();
+  return taskList().filter(x=>{ const s=taskText(x.t); return words.every(w=>s.includes(w)); });
+}
+/* A short piece of the answer around the first word that matched, so you can
+   see why a question came up. */
+function taskSnippet(t, q){
+  const a=String(t.answer||'').replace(/\s+/g,' ').trim(); if(!a) return '';
+  const w=String(q||'').toLowerCase().split(/\s+/).filter(Boolean).find(x=>a.toLowerCase().includes(x));
+  if(!w) return a.length>120 ? a.slice(0,118)+'…' : a;
+  const at=a.toLowerCase().indexOf(w), from=Math.max(0, at-50);
+  return (from?'…':'')+a.slice(from, from+130)+(from+130<a.length?'…':'');
+}
+function taskMark(text, q){
+  let h=esc(text);
+  String(q||'').split(/\s+/).filter(w=>w.length>1).forEach(w=>{
+    const re=new RegExp('('+esc(w).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig');
+    h=h.replace(re,'<mark>$1</mark>');
+  });
+  return h;
+}
+function taskRow(x, q){
+  const owner=taskOwner(x.t), snip=taskSnippet(x.t, q);
+  return `<button class="tq" data-task="${x.i}">
+    <span class="tq-q">${taskMark(x.t.label, q)}</span>
+    ${snip ? `<span class="tq-a">${taskMark(snip, q)}</span>` : ''}
+    ${owner ? `<span class="tq-o">${esc(owner)}</span>` : ''}
+    <span class="tq-go" aria-hidden="true">›</span></button>`;
+}
 function renderChips(){
-  $('#chips').innerHTML = (DATA.tasks||[]).map((t,i) => {
-    /* A task earns a chip if it routes somewhere, or if it simply has a
-       written answer — some questions need no team at all. */
-    if(!t.label) return '';
-    const routes = t.to && resolve(t.to);
-    /* A link on its own is a complete answer too, so it earns a chip. */
-    if(!routes && !(t.answer||'').trim() && !(t.link||'').trim()) return '';
-    return `<button class="chip" data-task="${i}">${esc(t.label)}</button>`;
-  }).join('');
+  const all=taskList(), front=frontTasks();
+  const more=all.length-front.length;
+  $('#chips').innerHTML = front.map(x=>`<button class="chip" data-task="${x.i}">${esc(x.t.label)}</button>`).join('')
+    + (all.length ? `<button class="chip chip-all" id="tasksAllBtn">${more>0 ? 'See all '+all.length+' questions' : 'Search the questions'} →</button>` : '');
+  const b=$('#tasksAllBtn'); if(b) b.onclick=()=>openAllTasks();
+}
+/* The full list, in a view of its own with its own search. */
+function openAllTasks(q){
+  const v=$('#tasksAll');
+  v.classList.add('on'); document.body.classList.add('noscroll');
+  const inp=$('#taq'); inp.value=q||''; drawAllTasks();
+  setTimeout(()=>inp.focus(), 30);
+}
+function closeAllTasks(){ $('#tasksAll').classList.remove('on'); document.body.classList.remove('noscroll'); }
+function drawAllTasks(){
+  const q=$('#taq').value.trim(), hits=taskMatches(q);
+  $('#taqclear').classList.toggle('on', !!q);
+  $('#taCount').textContent = q ? (hits.length+' of '+taskList().length+' questions') : (taskList().length+' questions');
+  if(!hits.length){
+    $('#taList').innerHTML=`<div class="empty"><strong>No question mentions “${esc(q)}”</strong>Try fewer words, or search the whole directory instead.
+      <div style="margin-top:12px"><button class="btn btn-sm" id="taDir">Search the directory for “${esc(q)}”</button></div></div>`;
+    $('#taDir').onclick=()=>{ closeAllTasks(); const box=$('#q'); box.value=q; box.dispatchEvent(new Event('input')); box.focus(); };
+    return;
+  }
+  /* grouped by who owns them, the way people think about it */
+  const groups=new Map();
+  hits.forEach(x=>{ const o=taskOwner(x.t)||'Other'; if(!groups.has(o)) groups.set(o,[]); groups.get(o).push(x); });
+  $('#taList').innerHTML=[...groups].map(([o,list])=>`
+    <div class="ta-group"><p class="ta-gh">${esc(o)}</p>${list.map(x=>taskRow(x,q)).join('')}</div>`).join('');
 }
 
 /* Who to try if the named person is away. Defaults to their own team, which
@@ -2179,11 +2336,16 @@ function renderPanel(){
 
   if(Q){
     $('#tabs').style.display='none'; fil.innerHTML='';
-    const h = hits(Q);
-    intro.textContent = h.length ? `${h.length} ${h.length===1?'result':'results'} for “${Q}”.` : '';
-    panel.innerHTML = h.length
-      ? `<div class="grid">${h.map((x,i)=> x.kind==='site'?siteCard(site(x.id),i,true) : x.kind==='dept'?deptCard(dept(x.id),i,true) : adminCardLight(adm(x.id),i)).join('')}</div>`
+    const h = hits(Q), tq = taskMatches(Q), TQN=4;
+    const n = h.length + tq.length;
+    intro.textContent = n ? `${n} ${n===1?'result':'results'} for “${Q}”.` : '';
+    const qs = tq.length ? `<div class="tq-sec"><h3>Questions<span>${tq.length}</span></h3>
+        ${tq.slice(0,TQN).map(x=>taskRow(x,Q)).join('')}
+        ${tq.length>TQN ? `<button class="btn btn-sm tq-more" id="tqMore">See all ${tq.length} matching questions</button>` : ''}</div>` : '';
+    panel.innerHTML = n
+      ? qs + (h.length ? `${tq.length?'<div class="tq-sec"><h3>Teams and people<span>'+h.length+'</span></h3></div>':''}<div class="grid">${h.map((x,i)=> x.kind==='site'?siteCard(site(x.id),i,true) : x.kind==='dept'?deptCard(dept(x.id),i,true) : adminCardLight(adm(x.id),i)).join('')}</div>` : '')
       : `<div class="empty"><strong>Nothing matches “${esc(Q)}”</strong>Try a city, a department, or check Minerva Support — the back office may own it.</div>`;
+    const tm=$('#tqMore'); if(tm) tm.onclick=()=>openAllTasks(Q);
     return;
   }
 
@@ -2599,10 +2761,17 @@ document.addEventListener('keydown', e=>{
     const p=ae&&ae.matches&&ae.matches('.pcard, .pitem-link')?ae:null;
     if(p){ e.preventDefault(); openRef(p.dataset.open); return; }
   }
-  if(e.key==='Escape'){ if(typeof ocIsOpen==='function'&&ocIsOpen()){ ocClose(); return; } closeDrawer(); }   /* Escape no longer closes Manage either */
+  if(e.key==='Escape'){ if(typeof ocIsOpen==='function'&&ocIsOpen()){ ocClose(); return; }
+    if(!$('#drawer').classList.contains('on') && $('#tasksAll').classList.contains('on')){ closeAllTasks(); return; }
+    closeDrawer(); }   /* Escape no longer closes Manage either */
   if(e.key==='/'&&document.activeElement!==$('#q')&&!$('#admin').classList.contains('on')&&!(typeof ocIsOpen==='function'&&ocIsOpen())){ e.preventDefault(); $('#q').focus(); }
 });
 $('#drClose').onclick=closeDrawer; $('#scrim').onclick=closeDrawer;
+$('#taClose').onclick=closeAllTasks;
+$('#taq').addEventListener('input', drawAllTasks);
+$('#taqclear').onclick=()=>{ $('#taq').value=''; drawAllTasks(); $('#taq').focus(); };
+/* picking a question leaves the list; the answer opens over the page */
+$('#taList').addEventListener('click', e=>{ if(e.target.closest('[data-task]')) closeAllTasks(); });
 $('#q').addEventListener('input', e=>{
   Q=e.target.value.trim().toLowerCase();
   $('#qclear').classList.toggle('on',!!Q);
@@ -2748,7 +2917,7 @@ function renderAdmin(){
   }
   $('.sheet-foot').style.display='';
   note(Store.status().t, Store.status().k==='ok'?'':(Store.status().k==='err'?'err':''));
-  const tabs=[['gaps','What\u2019s missing'],['sites','Sites'],['depts','Departments'],['people','Admin team'],['orgcharts','Org charts'],['tasks','Quick tasks'],['sync','Paychex'+(pendingCount()?'<span class="tcount">'+pendingCount()+'</span>':'')],['settings','Settings']];
+  const tabs=[['gaps','What\u2019s missing'],['sites','Sites'],['depts','Departments'],['people','Admin team'],['orgcharts','Org charts'],['ocpeople','People on charts'],['tasks','Quick tasks'],['sync','Paychex'+(pendingCount()?'<span class="tcount">'+pendingCount()+'</span>':'')],['settings','Settings']];
   const st=Store.status();
   const banner = st.k==='ok' ? '' :
     `<div class="banner banner-${st.k==='err'?'warn':'warn'}">
@@ -2760,7 +2929,7 @@ function renderAdmin(){
     <div id="apane"></div>`;
   b.querySelectorAll('[data-atab]').forEach(el=>el.onclick=()=>{ ATAB=el.dataset.atab; renderAdmin(); });
   const gb=$('#goBackend'); if(gb) gb.onclick=()=>{ ATAB='settings'; renderAdmin(); const t=$('#bkUrl'); if(t && t.scrollIntoView) t.scrollIntoView({block:'center'}); };
-  ({gaps:paneGaps, sites:paneSites, depts:paneDepts, people:panePeople, orgcharts:paneOrg, tasks:paneTasks, sync:paneSync, settings:paneSet}[ATAB])();
+  ({gaps:paneGaps, sites:paneSites, depts:paneDepts, people:panePeople, orgcharts:paneOrg, ocpeople:paneOcPeople, tasks:paneTasks, sync:paneSync, settings:paneSet}[ATAB])();
 }
 
 /* member row editor (shared by sites + depts) */
@@ -3257,7 +3426,11 @@ function paneTasks(){
     (sel&&sel.startsWith('person:')&&!findPerson(sel.slice(7)))
       ? `<optgroup label="Not found"><option value="${esc(sel)}" selected>${esc(sel.slice(7))} — no longer in the directory</option></optgroup>` : ''
   ].join('');
-  $('#apane').innerHTML=`<p class="sec-note" style="margin:0 0 14px">Write these the way someone would say the problem out loud, not the way the org chart says it.</p>
+  const nFront=(DATA.tasks||[]).filter(t=>t.front).length;
+  $('#apane').innerHTML=`<p class="sec-note" style="margin:0 0 8px">Write these the way someone would say the problem out loud, not the way the org chart says it.</p>
+    <p class="sec-note" style="margin:0 0 14px">Use <b>↑ ↓</b> to put them in the order you want; the front page and the full list follow it. Tick <b>Front page</b> on the few people ask most. The rest live under <b>See all questions</b>, which has its own search.
+      ${nFront ? nFront+' ticked'+(nFront>8?' — that’s a lot for the front page; six or so reads best.':'.') : 'None ticked, so the first '+TASK_FRONT+' show.'}
+      Search finds words in the answers too.</p>
     ${(DATA.tasks||[]).map((t,i)=>{
       const person = (t.to||'').startsWith('person:');
       const auto = person ? String((findPerson(t.to.slice(7))||{}).where||'').trim() : '';
@@ -3265,6 +3438,9 @@ function paneTasks(){
       return `<div class="tasked">
       <input data-tk="label" data-i="${i}" value="${esc(t.label)}" placeholder="The question, the way someone would ask it">
       <select data-tk="to" data-i="${i}">${opts(t.to)}</select>
+      <label class="tfront" title="Show this one on the front page"><input type="checkbox" data-tfront="${i}" ${t.front?'checked':''}> Front page</label>
+      <button class="iconbtn" data-tmove="${i}:-1" ${i===0?'disabled':''} title="Move up" aria-label="Move up">↑</button>
+      <button class="iconbtn" data-tmove="${i}:1" ${i===(DATA.tasks||[]).length-1?'disabled':''} title="Move down" aria-label="Move down">↓</button>
       <button class="iconbtn" data-pocopen="${i}" title="Search for a person" aria-label="Search POC">⌕</button>
       <button class="iconbtn" data-tmore="${i}" title="Written answer, link and fallback" aria-label="More">${extras?'\u25BE\u2022':'\u25BE'}</button>
       <button class="iconbtn" data-tdel="${i}" aria-label="Remove">×</button>
@@ -3325,6 +3501,23 @@ function paneTasks(){
     const i=+el.dataset.tdel, nm=(DATA.tasks[i]&&DATA.tasks[i].label)||'that task';
     snapshot('removing '+nm);
     DATA.tasks.splice(i,1); dirty(); paneTasks(); toastUndo('Removed '+nm+'.'); }; });
+  /* order: up and down, keeping your place in the list */
+  $('#apane').querySelectorAll('[data-tmove]').forEach(el=>el.onclick=()=>{
+    const [i,d]=el.dataset.tmove.split(':').map(Number), sb=$('#apane').closest('.sheet-body'), top=sb?sb.scrollTop:0;
+    const label=(DATA.tasks[i]||{}).label||'that question';
+    snapshot('moving “'+label+'”');
+    if(!moveItem(DATA.tasks, i, i+d)){ HIST.pop(); return; }
+    dirty(); renderChips(); paneTasks();
+    if(sb) sb.scrollTop=top;
+    const b=$('#apane').querySelector(`[data-tmove="${i+d}:${d}"]:not([disabled])`) || $('#apane').querySelector(`[data-tmove="${i+d}:${-d}"]`);
+    if(b) b.focus();
+  });
+  $('#apane').querySelectorAll('[data-tfront]').forEach(el=>el.onchange=()=>{
+    const t=DATA.tasks[+el.dataset.tfront]; if(!t) return;
+    snapshot((el.checked?'putting ':'taking ')+'“'+t.label+'”'+(el.checked?' on':' off')+' the front page');
+    if(el.checked) t.front=true; else delete t.front;
+    dirty(); renderChips(); paneTasks();
+  });
   $('#addT').onclick=()=>{ DATA.tasks.push({label:'New request', to:'dept:'+(DATA.depts[0]?DATA.depts[0].id:'')}); dirty(); paneTasks(); };
 }
 
@@ -4784,9 +4977,57 @@ function ocCfg(){
     top:has('top')?String(og.top||'').trim():OC_DEF.org.top,
     sites:has('sites')?String(og.sites||'').trim():OC_DEF.org.sites,
     depts:has('depts')?String(og.depts||'').trim():OC_DEF.org.depts};
-  return {labels:pick(OC_DEF.labels,c.labels), show:pick(OC_DEF.show,c.show), pdf:pick(OC_DEF.pdf,c.pdf), org, reportsTo:rt, hide};
+  /* per person, set in Manage → People on charts: which team they are drawn
+     in, which card they hang under, and the title printed on their card */
+  const people=new Map();
+  const pp=(c.people && typeof c.people==='object') ? c.people : {};
+  Object.keys(pp).forEach(k=>{ const v=pp[k]; if(!v) return;
+    const o={team:String(v.team||'').trim(), at:String(v.at||'').trim(), title:String(v.title||'').trim()};
+    if(o.team||o.at||o.title) people.set(ocKey(k), o); });
+  /* whole positions: anyone whose title contains this hangs under that card */
+  const roles=(Array.isArray(c.roles)?c.roles:[]).map(r=>r&&{match:String(r.match||'').trim().toLowerCase(), at:String(r.at||'').trim()})
+    .filter(r=>r && r.match && r.at);
+  return {labels:pick(OC_DEF.labels,c.labels), show:pick(OC_DEF.show,c.show), pdf:pick(OC_DEF.pdf,c.pdf), org, reportsTo:rt, hide, people, roles};
 }
 const ocHidden = n => ocCfg().hide.has(ocKey(n));
+/* What Manage → People on charts says about one person, or null. */
+const ocPlace = n => ocCfg().people.get(ocKey(n)) || null;
+/* The title printed on someone's card: the chart-only title if one is set. */
+const ocTitle = (n, t) => { const p=ocPlace(n); return (p && p.title) || t || ''; };
+/* The first position rule whose words appear in this title. */
+function ocRule(title){
+  const t=String(title||'').toLowerCase(); if(!t) return null;
+  return ocCfg().roles.find(r=>t.includes(r.match)) || null;
+}
+/* Where a person in a team's list hangs: their own setting first, then a
+   position rule. '' means the usual place, under the lead. */
+function ocAtFor(name, role){
+  const p=ocPlace(name); if(p && p.at) return p.at;
+  const r=ocRule(role); return r ? r.at : '';
+}
+/* Someone drawn in another team than the directory has them in */
+const ocMovedAway = (n, ref) => { const p=ocPlace(n); return !!(p && p.team && p.team!==ref); };
+/* Everyone moved into this team from elsewhere, as the directory lists them */
+function ocMovedIn(ref, have){
+  const out=[];
+  ocCfg().people.forEach((v,k)=>{
+    if(v.team!==ref || have.has(k) || ocCfg().hide.has(k)) return;
+    const r=ocStaffRec(k); if(r){ have.add(k); out.push(r); }
+  });
+  return out;
+}
+/* A person's own directory record (name, title, email, phone), from wherever they are listed */
+function ocStaffRec(k){
+  for(const s of (DATA.sites||[])){
+    for(const m of (s.team||[])) if(m && ocKey(m.name)===k) return {name:m.name, role:m.role||m.title||'', email:m.email||'', phone:m.phone||''};
+    for(const sl of ['crm','lead','backup']) for(const q of slotPeople(s[sl])) if(ocKey(q.name)===k) return {name:q.name, role:q.title||'', email:q.email||'', phone:q.phone||''};
+  }
+  for(const d of (DATA.depts||[])){
+    for(const m of (d.team||[])) if(m && ocKey(m.name)===k) return {name:m.name, role:m.role||m.title||'', email:m.email||'', phone:m.phone||''};
+    for(const q of slotPeople(d.head)) if(ocKey(q.name)===k) return {name:q.name, role:q.title||'', email:q.email||'', phone:q.phone||''};
+  }
+  return null;
+}
 const ocPl = (label, n) => n>1 ? (/s$/i.test(label) ? label : label+'s') : label;
 /* "Site lead" → "site lead" inside a phrase, but "PI" and "CRM" stay as they are */
 const ocLow = s => s.length>1 && s[1]===s[1].toLowerCase() ? s.charAt(0).toLowerCase()+s.slice(1) : s;
@@ -4808,14 +5049,14 @@ function ocResolve(name){
 /* A person as a card entry: admins link to their admin page, others to their own. */
 function ocEntry(name){
   const a=(DATA.admins||[]).find(x=>ocKey(x.name)===ocKey(name));
-  if(a) return {name:a.name, title:a.title||'Admin team', email:a.email||'', phone:a.phone||'', ref:'admin:'+a.id};
+  if(a) return {name:a.name, title:ocTitle(a.name, a.title||'Admin team'), email:a.email||'', phone:a.phone||'', ref:'admin:'+a.id};
   const w=ocWho(name); return {name:w.name, title:w.title, email:'', phone:'', ref:'person:'+w.name};
 }
 /* A display name, title and colour for someone named only in Manage. */
 function ocWho(name){
   const p=findPerson(name), a=(DATA.admins||[]).find(x=>ocKey(x.name)===ocKey(name));
   const pl=ocPlaces(name)[0], t=pl && ocTeamOf(pl);
-  return {name:(p&&p.name)||(a&&a.name)||name, title:(p&&p.role)||(a&&a.title)||'',
+  return {name:(p&&p.name)||(a&&a.name)||name, title:ocTitle(name, (p&&p.role)||(a&&a.title)||''),
     acc:t ? t.acc : (a ? OC_ADMIN : OC_NAVY)};
 }
 
@@ -4826,7 +5067,7 @@ let OC_FORCE_OWN=false;   /* the whole-organisation chart needs owners even if t
 function ocOwners(ref){
   const C=ocCfg(); if(!C.show.oversight && !OC_FORCE_OWN) return null;
   let ppl=(DATA.admins||[]).filter(a=>a && a.name && !C.hide.has(ocKey(a.name)) && ownsList(a).some(o=>o.ref===ref))
-    .map(a=>({name:a.name, title:a.title||'Admin team', email:a.email||'', phone:a.phone||'', ref:'admin:'+a.id}));
+    .map(a=>({name:a.name, title:ocTitle(a.name, a.title||'Admin team'), email:a.email||'', phone:a.phone||'', ref:'admin:'+a.id}));
   if(!ppl.length){
     const d=ocResolve(String(ref).startsWith('site:') ? C.org.sites : C.org.depts);
     if(d && !C.hide.has(ocKey(d))) ppl=[ocEntry(d)];
@@ -4835,7 +5076,7 @@ function ocOwners(ref){
 }
 function ocSlot(o, fallback){
   return slotPeople(o).filter(p=>!ocHidden(p.name))
-    .map(p=>({name:p.name, title:p.title||fallback, email:p.email||'', phone:p.phone||'', ref:'person:'+p.name}));
+    .map(p=>({name:p.name, title:ocTitle(p.name, p.title||fallback), email:p.email||'', phone:p.phone||'', ref:'person:'+p.name}));
 }
 
 /* A team as a list of levels, top to bottom. The last level may be a "stack":
@@ -4862,15 +5103,53 @@ function ocSiteLevels(s){
   else if(lead.length) L.push({type:'people', tag:ocPl(Lb.lead,lead.length), people:lead, acc:a});
   /* An empty slot is an open post. A slot whose holder is hidden is not. */
   else if(!slotPeople(s.lead).length && C.show.openPosts) L.push({type:'vacant', tag:Lb.lead, text:Lb.vacant, acc:a});
-  const items=[];
+  const items=[], ref='site:'+s.id;
   const back=ocSlot(s.backup,Lb.backup);
   if(back.length && ocKey(s.backup.name)!==ocKey(s.lead&&s.lead.name))
     back.forEach(p=>items.push(Object.assign({tag:Lb.backup}, p)));
-  const staff=siteStaff(s).filter(m=>!ocHidden(m.name));
+  const have=new Set([...leadNames(s)].map(ocKey));
+  const mine=siteStaff(s).filter(m=>!ocHidden(m.name) && !ocMovedAway(m.name, ref));
+  mine.forEach(m=>have.add(ocKey(m.name)));
+  const staff=[...mine, ...ocMovedIn(ref, have)];
   [...staff.filter(ocCRC), ...staff.filter(m=>!ocCRC(m))].forEach(m=>
-    items.push({name:m.name, title:m.role||'', email:m.email||'', phone:m.phone||'', ref:'person:'+m.name}));
+    items.push({name:m.name, title:ocTitle(m.name, m.role||''), role:m.role||'', email:m.email||'', phone:m.phone||'', ref:'person:'+m.name}));
   if(items.length) L.push({type:'stack', items, acc:a});
+  L.slots=ocSlots(L);
   return ocTeamCount(L);
+}
+/* Where each card sits in a team's levels, so a person can be hung under
+   "the CRM" or "the site" whoever holds the post this week. */
+function ocSlots(L){
+  const C=ocCfg(), Lb=C.labels, o={};
+  const t=L.findIndex(l=>l.type==='team');
+  L.forEach((l,i)=>{
+    if(l.type==='people' && l.tag===Lb.oversight) o.oversight=i;
+    else if(l.type==='people' && i<t) o.crm=i;
+    else if((l.type==='people'||l.type==='vacant') && i>t) o.lead=i;
+  });
+  if(t>=0) o.site=t;
+  return o;
+}
+/* Where one person in a team's list goes instead of under the lead:
+   {nest:name} hangs them under someone else in the same list,
+   {j:level} under a card higher up, null the usual place. */
+function ocTarget(L, si, it){
+  const C=ocCfg(), Lb=C.labels;
+  const boss=ocBoss(it.name);
+  if(boss){
+    const bk=ocKey(boss);
+    if(L[si].items.some(x=>ocKey(x.name)===bk)) return {nest:boss};
+    for(let j=si-1;j>=0;j--) if(L[j].type==='people' && L[j].people.some(p=>ocKey(p.name)===bk)) return j===si-1 ? null : {j};
+    return null;
+  }
+  const at=ocAtFor(it.name, it.role||it.title);
+  if(!at) return null;
+  if(at==='backup'){
+    const b=L[si].items.find(x=>x.tag===Lb.backup && ocKey(x.name)!==ocKey(it.name));
+    return b ? {nest:b.name} : null;
+  }
+  const j=(L.slots||{})[at];
+  return j==null || j>=si-1 ? null : {j};
 }
 /* How many people the team has, counted once from the levels under its header.
    A reporting line shows only part of the team, but the header still tells
@@ -4890,12 +5169,16 @@ function ocDeptLevels(d){
   L.push({type:'team', tag:Lb.dept, name:d.name||Lb.dept, sub:'', acc:a, ref:'dept:'+d.id});
   const head=ocSlot(d.head,Lb.dlead);
   const heads=new Set(slotPeople(d.head).map(p=>ocKey(p.name)));
-  const team=(d.team||[]).filter(m=>m && m.name && !heads.has(ocKey(m.name)) && !ocHidden(m.name))
-    .map(m=>({name:m.name, title:m.role||'', email:m.email||'', phone:m.phone||'', ref:'person:'+m.name}));
+  const ref='dept:'+d.id, have=new Set(heads);
+  const mine=(d.team||[]).filter(m=>m && m.name && !heads.has(ocKey(m.name)) && !ocHidden(m.name) && !ocMovedAway(m.name, ref));
+  mine.forEach(m=>have.add(ocKey(m.name)));
+  const team=[...mine, ...ocMovedIn(ref, have)]
+    .map(m=>({name:m.name, title:ocTitle(m.name, m.role||''), role:m.role||'', email:m.email||'', phone:m.phone||'', ref:'person:'+m.name}));
   if(head.length) L.push({type:'people', tag:ocPl(Lb.dlead,head.length), people:head, acc:a});
   else if(!heads.size && C.show.openPosts && (team.length || (d.head && d.head.title)))
     L.push({type:'vacant', tag:Lb.dlead, text:Lb.vacant, title:(d.head&&d.head.title)||'', acc:a});
   if(team.length) L.push({type:'stack', items:team, acc:a});
+  L.slots=ocSlots(L);
   return ocTeamCount(L);
 }
 function ocLevels(ref){
@@ -4921,13 +5204,15 @@ function ocLeaf(it, acc, focus){
 /* The column at the bottom of a team. Anyone given a manager in Manage who is
    also in this column moves under them; a manager elsewhere is noted on the
    card instead, unless they already sit above this team. */
-function ocColumn(L, lv, focus){
-  const C=ocCfg();
+function ocColumn(L, lv, focus, lifts){
+  const C=ocCfg(), si=L.indexOf(lv);
   const above=new Set(); L.forEach(l=>{ if(l.type==='people') l.people.forEach(p=>above.add(ocKey(p.name))); });
   const leaves=lv.items.map(it=>ocLeaf(it, lv.acc, focus));
   const by=new Map(leaves.map(l=>[ocKey(l.name), l])), up=new Map(), top=[];
-  leaves.forEach(l=>{
-    const boss=ocBoss(l.name), b=boss && by.get(ocKey(boss));
+  leaves.forEach((l,ix)=>{
+    const tg=ocTarget(L, si, lv.items[ix]);
+    if(tg && tg.j!=null){ (lifts||[]).push({j:tg.j, leaf:l}); if(lifts) return; }
+    const boss=(tg && tg.nest) || ocBoss(l.name), b=boss && by.get(ocKey(boss));
     let ok=!!b && b!==l;
     for(let x=b; ok && x; x=up.get(x)) if(x===l) ok=false;   /* no loops */
     if(ok){ b.kids.push(l); up.set(l,b); return; }
@@ -4937,10 +5222,24 @@ function ocColumn(L, lv, focus){
   return top;
 }
 function ocBuild(L, i, focus){
-  if(i>=L.length) return [];
-  const lv=L[i];
-  if(lv.type==='stack') return ocColumn(L, lv, focus);
-  const n=ocNode(lv, focus); n.kids=ocBuild(L, i+1, focus); return [n];
+  const at=[], lifts=[];
+  const rec=j=>{
+    if(j>=L.length) return [];
+    const lv=L[j];
+    if(lv.type==='stack') return ocColumn(L, lv, focus, lifts);
+    const n=ocNode(lv, focus); at[j]=n; n.kids=rec(j+1); return [n];
+  };
+  const out=rec(i);
+  /* People set to hang under a card higher up get a card of their own beside
+     what is already there. Under the person this chart starts from (level
+     i-1), they sit at the top. Under someone above that, they are not part
+     of this chart at all. */
+  lifts.forEach(({j, leaf})=>{
+    const card={k:'p', tag:leaf.tag, acc:leaf.acc, kids:leaf.kids,
+      people:[{name:leaf.name, title:leaf.title, ref:leaf.ref, focus:leaf.focus}]};
+    if(at[j]) at[j].kids.push(card); else if(j===i-1) out.push(card);
+  });
+  return out;
 }
 function ocFind(L, name){
   const k=ocKey(name);
@@ -5016,8 +5315,14 @@ function ocProfile(name, admin){
   const roles=ocRoles(places.map(x=>ocRoleIn(x,name)));
   let reports=ocBoss(name);
   const up=places.find(x=>x.i>0);
+  let from=up ? up.i-1 : -1;
+  if(!reports && up && up.L[up.i].type==='stack'){
+    const it=up.L[up.i].items.find(x=>ocKey(x.name)===ocKey(name)), tg=it && ocTarget(up.L, up.i, it);
+    if(tg && tg.nest) reports=tg.nest;
+    else if(tg && tg.j!=null) from=tg.j;
+  }
   if(!reports && up){
-    for(let j=up.i-1;j>=0;j--){
+    for(let j=from;j>=0;j--){
       const lv=up.L[j];
       if(lv.type==='people'){
         const ppl=lv.people.filter(q=>ocKey(q.name)!==ocKey(name)).map(q=>q.name);
@@ -5030,7 +5335,7 @@ function ocProfile(name, admin){
   const first=places[0], team=first && ocTeamOf(first);
   return {
     name, places, roles, reports, where,
-    title: p.role || (a && a.title) || roles[0] || '',
+    title: ocTitle(name, p.role || (a && a.title) || roles[0] || ''),
     email: C.show.contact ? (p.email || (a && a.email) || '') : '',
     phone: C.show.contact ? (p.phone || (a && a.phone) || '') : '',
     acc: team ? team.acc : (a ? OC_ADMIN : OC_NAVY)
@@ -5041,16 +5346,15 @@ function ocProfile(name, admin){
 function ocChain(L, i, name, focus){
   if(focus===undefined) focus=name;
   let top=null, cur=null;
-  for(let j=0;j<=i;j++){
-    const lv=L[j];
-    let n;
-    if(lv.type==='stack'){
-      const it=lv.items.find(x=>ocKey(x.name)===ocKey(name));
-      n=ocLeaf(it, lv.acc, focus);
-    } else n=ocNode(lv, focus);
-    if(!top) top=n; else cur.kids=[n];
-    cur=n;
-  }
+  const add=n=>{ if(!top) top=n; else cur.kids=[n]; cur=n; };
+  const lv=L[i], it=lv.type==='stack' && lv.items.find(x=>ocKey(x.name)===ocKey(name));
+  const tg=it ? ocTarget(L, i, it) : null;
+  const last=tg && tg.j!=null ? tg.j : i-1;
+  for(let j=0;j<=last;j++) add(ocNode(L[j], focus));
+  if(it){
+    if(tg && tg.nest){ const b=lv.items.find(x=>ocKey(x.name)===ocKey(tg.nest)); if(b) add(ocLeaf(b, lv.acc, focus)); }
+    add(ocLeaf(it, lv.acc, focus));
+  } else if(i>last) add(ocNode(lv, focus));
   return top;
 }
 const ocDeepest = n => { while(n.kids && n.kids.length) n=n.kids[n.kids.length-1]; return n; };
@@ -6163,7 +6467,9 @@ function paneOrg(){
 
     <h3 class="ocm-h">Who reports to whom</h3>
     <p class="sec-note ocm-n">For what the slots can’t say: a lead CRC who supervises two coordinators, or someone whose manager is in another team.
-      Someone in the same team moves under their manager. A manager elsewhere is noted on their card, and their own chart and PDF run through that manager.</p>
+      Someone in the same team moves under their manager. A manager elsewhere is noted on their card, and their own chart and PDF run through that manager.
+      <b>People on charts</b> does the same thing one person at a time, and can hang whole positions under the CRM.
+      <button class="btn btn-sm" data-ocjump="ocpeople">People on charts</button></p>
     <datalist id="ocNames">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
     <div id="ocRt">${rows.length ? rows.map((r,j)=>{ const pr=ocRowProblem(r,j,rows,known); return `
       <div class="ocm-row">
@@ -6284,6 +6590,276 @@ function paneOrg(){
   $('#ocReset').onclick=()=>{
     snapshot('resetting the org chart settings'); delete DATA.orgchart; dirty(); paneOrg();
     toastUndo('Org chart settings are back to how they started.');
+  };
+}
+
+/* ─── 8. Manage → People on charts ───────────────────────────── */
+
+/* Everyone who can appear on a chart, once each, with where the directory
+   (and so Paychex) puts them. kind: 'staff' can be moved between teams and
+   hung under any card; 'post' holds a slot (CRM, lead...); 'admin' is on the
+   admin team. */
+function ocpPeople(){
+  const m=new Map();
+  const add=(name, title, ref, team, post, kind)=>{
+    name=String(name||'').trim(); if(!name) return;
+    const k=ocKey(name); let e=m.get(k);
+    if(!e){ e={k, name, title:title||'', places:[]}; m.set(k,e); }
+    if(!e.title && title) e.title=title;
+    e.places.push({ref, team, post, kind});
+  };
+  (DATA.admins||[]).forEach(a=>add(a.name, a.title, 'admin:'+a.id, 'Admin team', 'Admin team', 'admin'));
+  (DATA.depts||[]).forEach(d=>{ const r='dept:'+d.id;
+    slotPeople(d.head).forEach(q=>add(q.name, q.title, r, d.name, 'Department lead', 'post'));
+    const heads=new Set(slotPeople(d.head).map(q=>ocKey(q.name)));
+    (d.team||[]).forEach(x=>{ if(x && x.name && !heads.has(ocKey(x.name))) add(x.name, x.role||x.title, r, d.name, '', 'staff'); });
+  });
+  (DATA.sites||[]).forEach(s=>{ const r='site:'+s.id;
+    [['crm','CRM'],['lead','Site lead'],['backup','Backup lead']].forEach(([sl,lab])=>
+      slotPeople(s[sl]).forEach(q=>add(q.name, q.title, r, s.city, lab, sl==='backup'?'staff':'post')));
+    siteStaff(s).forEach(x=>add(x.name, x.role||x.title, r, s.city, '', 'staff'));
+  });
+  return [...m.values()].map(e=>{
+    const staff=e.places.find(p=>p.kind==='staff');
+    e.home=(staff || e.places.find(p=>p.kind==='post') || e.places[0]);
+    e.movable=!!staff && !e.places.some(p=>p.kind==='post');
+    e.admin=e.places.some(p=>p.kind==='admin');
+    return e;
+  });
+}
+const ocpTeamName = ref => { const s=String(ref||''), id=s.slice(s.indexOf(':')+1);
+  if(s.startsWith('site:')){ const x=site(id); return x ? x.city : ''; }
+  if(s.startsWith('dept:')){ const x=dept(id); return x ? x.name : ''; }
+  return s.startsWith('admin:') ? 'Admin team' : ''; };
+/* The cards someone in this team could hang under, with who holds each now */
+function ocpSpots(ref){
+  const L=ocLevels(ref); if(!L) return [];
+  const sl=L.slots||{}, who=j=>{ const l=L[j]; if(!l) return '';
+    if(l.type==='people') return l.people.map(p=>p.name).join(' & ');
+    if(l.type==='vacant') return 'nobody yet';
+    return l.name||''; };
+  const site=String(ref).startsWith('site:'), out=[];
+  if(sl.lead!=null) out.push(['lead', (site?'Site lead':'Department lead')+' — '+who(sl.lead)]);
+  if(site) out.push(['backup', 'Backup lead (the one in the list)']);
+  if(sl.crm!=null) out.push(['crm', 'CRM — '+who(sl.crm)]);
+  if(sl.site!=null) out.push(['site', 'Directly under the '+(site?'site':'department')+' card']);
+  if(sl.oversight!=null) out.push(['oversight', 'Whoever oversees it — '+who(sl.oversight)]);
+  return out;
+}
+const OCP={open:new Set(), q:'', changed:false};
+const OCP_AT={lead:'The lead (as usual)', crm:'The site’s CRM', backup:'The backup lead', site:'Directly under the site or department card', oversight:'Whoever oversees the team'};
+
+function ocpBoss(name){ const r=(ocStore().reportsTo||[]).find(x=>ocKey(x.who)===ocKey(name)); return r ? r.to : ''; }
+function ocpSetBoss(name, to){
+  const c=ocStore(), k=ocKey(name);
+  const keep=c.reportsTo.filter(x=>ocKey(x.who)!==k);
+  if(to!=null) keep.push({who:name, to});
+  c.reportsTo=keep;
+}
+function ocpSet(name, field, v){
+  const c=ocStore(); c.people=c.people||{};
+  const k=ocKey(name), e=Object.assign({name}, c.people[k]||{});
+  if(v) e[field]=v; else delete e[field];
+  if(!e.team && !e.at && !e.title) delete c.people[k]; else c.people[k]=e;
+}
+/* What has been changed for this person, in a few words, or '' */
+function ocpChanges(e){
+  const c=ocStore(), p=(c.people||{})[e.k]||{}, out=[];
+  if(c.hide.some(n=>ocKey(n)===e.k)) out.push('left off');
+  if(p.team) out.push('moved team');
+  if(p.at || ocpBoss(e.name)) out.push('reports elsewhere');
+  if(p.title) out.push('chart title');
+  return out.join(', ');
+}
+
+function paneOcPeople(){
+  const c=ocStore(); c.people=c.people||{}; if(!Array.isArray(c.roles)) c.roles=[];
+  const all=ocpPeople(), names=ocAllNames();
+  const teamOf=e=>{ const p=ocPlace(e.name); return (e.movable && p && p.team) || e.home.ref; };
+  /* groups in the order the directory shows them */
+  const order=[['admin','Admin team'], ...(DATA.depts||[]).map(d=>['dept:'+d.id, d.name]), ...(DATA.sites||[]).map(s=>['site:'+s.id, s.city])];
+  const groups=new Map(order.map(([r,l])=>[r,{label:l, list:[]}]));
+  all.forEach(e=>{ const r=e.admin ? 'admin' : teamOf(e); (groups.get(r)||groups.get('admin')).list.push(e); });
+  const scroll=($('#apane').closest('.sheet-body')||{}).scrollTop;
+  const ruleHits=r=>all.filter(e=>!e.admin && e.places.some(p=>p.kind==='staff') && String(e.title||'').toLowerCase().includes(String(r.match||'').trim().toLowerCase()) && String(r.match||'').trim()).map(e=>e.name);
+
+  $('#apane').innerHTML=`
+    <div class="banner banner-info" style="margin-top:0"><strong>Where each person sits on the org charts.</strong>
+      Changes here only move people on the charts and their PDFs. The directory, and whatever Paychex says, stay exactly as they are,
+      and a Paychex update never undoes what you set here.</div>
+
+    <h3 class="ocm-h">Whole positions</h3>
+    <p class="sec-note ocm-n">For a kind of job that never reports to the site lead. Anyone whose title contains these words hangs under the card you pick,
+      at every site, including people hired later. A setting on one person below always wins.</p>
+    <div id="ocpRules">${c.roles.length ? c.roles.map((r,j)=>{ const h=ruleHits(r); return `
+      <div class="ocp-rule">
+        <span class="ocm-to">Title contains</span>
+        <input data-rule="match" data-j="${j}" value="${esc(r.match||'')}" placeholder="e.g. Physician Assistant" aria-label="Words in the title">
+        <span class="ocm-to">→ under</span>
+        <select data-rule="at" data-j="${j}" aria-label="Card they hang under">${['crm','site','backup','oversight','lead'].map(a=>`<option value="${a}" ${r.at===a?'selected':''}>${OCP_AT[a]}</option>`).join('')}</select>
+        <button class="iconbtn" data-ruledel="${j}" aria-label="Remove this rule" title="Remove">×</button>
+        <span class="ocm-warn ocp-hits" id="ocpHit${j}">${String(r.match||'').trim() ? (h.length ? 'Applies to '+h.length+': '+esc(h.slice(0,6).join(', '))+(h.length>6?'…':'') : 'Nobody has a title like that yet.') : ''}</span>
+      </div>`; }).join('') : '<p class="sec-note ocm-empty">No rules yet. Everyone in a site’s list hangs under the site lead.</p>'}</div>
+    <button class="btn btn-sm" id="ocpRuleAdd">+ Add a position rule</button>
+
+    <h3 class="ocm-h">Everyone</h3>
+    <p class="sec-note ocm-n">Click a person to choose where they show up: which team, which card they hang under, the title on their card, or leave them off.</p>
+    <div class="ocp-tools">
+      <input id="ocpQ" type="search" value="${esc(OCP.q)}" placeholder="Find a person, title or team" aria-label="Find a person">
+      <label class="ocp-only"><input type="checkbox" id="ocpChanged" ${OCP.changed?'checked':''}> Only people I’ve changed</label>
+    </div>
+    <datalist id="ocpNames">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+    <div id="ocpList">${[...groups].filter(([,g])=>g.list.length).map(([r,g])=>`
+      <div class="ocp-group" data-group="${esc(r)}">
+        <p class="ocp-gh">${esc(g.label)} <span>${g.list.length}</span></p>
+        ${g.list.map(e=>ocpRow(e)).join('')}
+      </div>`).join('')}</div>
+    <p class="sec-note ocp-none" id="ocpNone" hidden>Nobody matches.</p>`;
+
+  const p=$('#apane');
+  /* position rules */
+  p.querySelectorAll('[data-rule]').forEach(el=>{
+    const j=+el.dataset.j;
+    if(el.tagName==='SELECT') el.onchange=()=>{ snapshot('that position rule'); c.roles[j].at=el.value; dirty(); paneOcPeople(); };
+    else{
+      el.oninput=()=>{ markTyping('ocprule'+j, 'that position rule'); c.roles[j].match=el.value; dirty();
+        const h=ruleHits(c.roles[j]), w=$('#ocpHit'+j);
+        if(w) w.textContent=el.value.trim() ? (h.length ? 'Applies to '+h.length+': '+h.slice(0,6).join(', ')+(h.length>6?'…':'') : 'Nobody has a title like that yet.') : ''; };
+      el.onchange=()=>paneOcPeople();
+    }
+  });
+  p.querySelectorAll('[data-ruledel]').forEach(el=>el.onclick=()=>{
+    snapshot('removing a position rule'); c.roles.splice(+el.dataset.ruledel,1); dirty(); paneOcPeople(); toastUndo('Rule removed.');
+  });
+  $('#ocpRuleAdd').onclick=()=>{
+    snapshot('adding a position rule'); c.roles.push({match:'', at:'crm'}); dirty(); paneOcPeople();
+    const ins=p.querySelectorAll('[data-rule="match"]'); if(ins.length) ins[ins.length-1].focus();
+  };
+
+  /* search and the changed-only filter, without redrawing */
+  const filter=()=>{
+    const q=OCP.q.trim().toLowerCase(); let any=false;
+    p.querySelectorAll('.ocp-group').forEach(g=>{
+      let n=0;
+      g.querySelectorAll('.acc').forEach(a=>{
+        const ok=(!q || a.dataset.find.includes(q)) && (!OCP.changed || a.dataset.changed==='1');
+        a.hidden=!ok; if(ok) n++;
+      });
+      g.hidden=!n; if(n) any=true;
+    });
+    $('#ocpNone').hidden=any;
+  };
+  $('#ocpQ').oninput=e=>{ OCP.q=e.target.value; filter(); };
+  $('#ocpChanged').onchange=e=>{ OCP.changed=e.target.checked; filter(); };
+  filter();
+
+  /* open and close a person; their editor is built when opened */
+  p.querySelectorAll('[data-ocp]').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.ocp, acc=el.closest('.acc');
+    if(OCP.open.has(k)){ OCP.open.delete(k); acc.classList.remove('open'); return; }
+    OCP.open.add(k); acc.classList.add('open'); ocpFill(acc, all.find(e=>e.k===k));
+  });
+  p.querySelectorAll('.acc.open').forEach(acc=>ocpFill(acc, all.find(e=>e.k===acc.dataset.k)));
+  const sb=$('#apane').closest('.sheet-body'); if(sb && scroll!=null) sb.scrollTop=scroll;
+}
+
+function ocpRow(e){
+  const ch=ocpChanges(e), P=ocProfile(e.name), team=ocpTeamName((ocPlace(e.name)||{}).team) || e.home.team;
+  const rule=!e.admin && e.places.some(p=>p.kind==='staff') && !(ocPlace(e.name)||{}).at && !ocpBoss(e.name) && ocRule(e.title);
+  const left=ocHidden(e.name);
+  const sub=[ocTitle(e.name, e.title) || e.home.post, e.admin ? '' : team].filter(Boolean).join(' · ');
+  return `<div class="acc ocp ${OCP.open.has(e.k)?'open':''}" data-k="${esc(e.k)}" data-changed="${ch?'1':'0'}"
+      data-find="${esc([e.name, e.title, team, ...e.places.map(x=>x.team)].join(' ').toLowerCase())}">
+    <button class="acc-h" data-ocp="${esc(e.k)}">
+      <span style="min-width:0"><span class="role" style="display:block">${esc(e.name)}</span>
+        <span class="holder">${esc(sub)}</span></span>
+      <span class="ocp-under">${left ? '<em>Left off the charts</em>' : P.reports ? 'Under <b>'+esc(P.reports)+'</b>' : (e.admin?'Admin team':'')}
+        ${ch ? `<span class="ocp-badge">Changed</span>` : rule ? `<span class="ocp-badge ocp-rulebadge">Position rule</span>` : ''}</span>
+      <span class="caret">▾</span></button>
+    <div class="acc-b"></div>
+  </div>`;
+}
+
+function ocpFill(acc, e){
+  if(!e) return;
+  const b=acc.querySelector('.acc-b'), c=ocStore();
+  const pl=(c.people||{})[e.k]||{}, boss=ocpBoss(e.name);
+  const chartTeam=(e.movable && pl.team) || e.home.ref;
+  const staff=e.places.some(p=>p.kind==='staff') && !e.admin;
+  const spots=staff ? ocpSpots(chartTeam) : [];
+  const rule=staff && ocRule(e.title);
+  const usual=rule ? 'As usual for this title: '+ocLow(OCP_AT[rule.at]) : 'As usual'+(spots[0] ? ': '+spots[0][1] : '');
+  const atVal=boss ? 'person' : (pl.at||'');
+  const teams=[...(DATA.sites||[]).map(s=>['site:'+s.id, s.city+' · site']), ...(DATA.depts||[]).map(d=>['dept:'+d.id, d.name+' · department'])];
+  const left=ocHidden(e.name);
+  const posts=e.places.filter(p=>p.kind!=='staff' || p.post).map(p=>p.post+(p.kind==='admin'?'':' at '+p.team));
+  b.innerHTML=`
+    <p class="hint ocp-dir">In the directory: <b>${esc(e.title||'no title')}</b> · ${esc([...new Set(e.places.map(p=>p.team))].join(', '))}${posts.length ? ' · '+esc(posts.join(', ')) : ''}</p>
+    <label class="ocp-show"><input type="checkbox" data-f="show" ${left?'':'checked'}> <span><b>Show on the charts</b><small>Untick for contractors, temps or someone on leave. They stay in the directory.</small></span></label>
+    <div class="fgrid" ${left?'hidden':''}>
+      ${e.movable ? `<div class="f"><label>Team on the charts</label><select data-f="team">
+        <option value="">As in the directory: ${esc(e.home.team)}</option>
+        ${teams.filter(([r])=>r!==e.home.ref).map(([r,l])=>`<option value="${esc(r)}" ${pl.team===r?'selected':''}>${esc(l)}</option>`).join('')}</select>
+        <span class="hint">Draws them in another team without changing the directory.</span></div>` : ''}
+      <div class="f"><label>Reports to on the charts</label><select data-f="at">
+        <option value="">${esc(usual)}</option>
+        ${spots.slice(spots[0]&&spots[0][0]==='lead'&&!rule?1:0).map(([v,l])=>`<option value="${v}" ${atVal===v?'selected':''}>${esc(l)}</option>`).join('')}
+        <option value="person" ${atVal==='person'?'selected':''}>A specific person…</option></select>
+        ${staff ? '' : `<span class="hint">${e.admin ? 'Admin team members sit under the person at the top unless you pick someone.' : 'They hold a post (shown above), so their card stays where the post is. Pick a person to name their manager on their own chart.'}</span>`}</div>
+      <div class="f" data-boss ${atVal==='person'?'':'hidden'}><label>Their manager</label>
+        <input list="ocpNames" data-f="boss" value="${esc(boss)}" placeholder="Start typing a name"><span class="ocm-warn" data-bossw></span></div>
+      <div class="f"><label>Title on their card</label><input data-f="title" value="${esc(pl.title||'')}" placeholder="${esc(e.title||'As in the directory')}">
+        <span class="hint">Leave empty to use the directory title.</span></div>
+    </div>
+    <div class="ocp-now" data-now></div>
+    <div class="ocp-acts">
+      <button class="btn btn-sm" data-act="mine">Preview ${e.admin?'their':'their'} chart</button>
+      ${e.admin ? '' : `<button class="btn btn-sm" data-act="team">Preview ${esc(ocpTeamName(chartTeam))}</button>`}
+      ${ocpChanges(e) ? `<button class="btn btn-sm btn-danger" data-act="reset">Back to the directory’s version</button>` : ''}
+    </div>`;
+
+  const nowLine=()=>{
+    const n=b.querySelector('[data-now]'); if(!n) return;
+    if(ocHidden(e.name)){ n.innerHTML='Not on any chart.'; return; }
+    const P=ocProfile(e.name);
+    n.innerHTML='On the charts: '+(P.where.length?'<b>'+esc(P.where.join(', '))+'</b>':'<b>Admin team</b>')+(P.reports?', under <b>'+esc(P.reports)+'</b>':'');
+  };
+  const bossW=()=>{
+    const w=b.querySelector('[data-bossw]'), v=(b.querySelector('[data-f="boss"]')||{}).value||'';
+    const known=new Set(ocAllNames().map(ocKey));
+    w.textContent = !v.trim() ? 'Pick who they report to.' : !known.has(ocKey(v)) ? '“'+v+'” is not in the directory. Check the spelling.'
+      : ocKey(v)===e.k ? 'Someone cannot report to themselves.' : '';
+  };
+  nowLine(); if(atVal==='person') bossW();
+  const redraw=()=>paneOcPeople();
+  b.querySelector('[data-f="show"]').onchange=ev=>{
+    snapshot((ev.target.checked?'showing ':'leaving off ')+e.name);
+    if(ev.target.checked) c.hide=c.hide.filter(n=>ocKey(n)!==e.k); else if(!ocHidden(e.name)) c.hide.push(e.name);
+    dirty(); redraw();
+  };
+  const tm=b.querySelector('[data-f="team"]');
+  if(tm) tm.onchange=()=>{ snapshot('moving '+e.name+' on the charts'); ocpSet(e.name,'team',tm.value);
+    /* a card in the old team means nothing in the new one */
+    ocpSet(e.name,'at',''); dirty(); redraw(); };
+  b.querySelector('[data-f="at"]').onchange=ev=>{
+    const v=ev.target.value; snapshot('who '+e.name+' reports to');
+    if(v==='person'){ ocpSet(e.name,'at',''); ocpSetBoss(e.name, ocpBoss(e.name)||''); dirty();
+      b.querySelector('[data-boss]').hidden=false; const i=b.querySelector('[data-f="boss"]'); i.focus(); bossW(); return; }
+    ocpSetBoss(e.name, null); ocpSet(e.name,'at',v); dirty(); redraw();
+  };
+  const bi=b.querySelector('[data-f="boss"]');
+  bi.oninput=()=>{ markTyping('ocpboss'+e.k, 'who '+e.name+' reports to'); ocpSetBoss(e.name, bi.value.trim()); dirty(); bossW(); };
+  bi.onchange=redraw;
+  const ti=b.querySelector('[data-f="title"]');
+  ti.oninput=()=>{ markTyping('ocptitle'+e.k, e.name+'’s chart title'); ocpSet(e.name,'title',ti.value.trim()); dirty(); };
+  ti.onchange=redraw;
+  b.querySelector('[data-act="mine"]').onclick=()=>ocOpen(e.admin ? e.places.find(p=>p.kind==='admin').ref : 'person:'+e.name, false);
+  const tb=b.querySelector('[data-act="team"]'); if(tb) tb.onclick=()=>ocOpen(chartTeam, false);
+  const rb=b.querySelector('[data-act="reset"]');
+  if(rb) rb.onclick=()=>{
+    snapshot('resetting '+e.name+' on the charts');
+    delete c.people[e.k]; ocpSetBoss(e.name, null); c.hide=c.hide.filter(n=>ocKey(n)!==e.k);
+    dirty(); redraw(); toastUndo(e.name+' is back where the directory puts them.');
   };
 }
 </script>
