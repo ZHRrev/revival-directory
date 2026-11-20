@@ -5100,9 +5100,9 @@ function ocSiteLevels(s){
     pis: C.show.pis ? pis.map(p=>p.name) : [],
     acc:a, ref:'site:'+s.id});
   if(same){}
-  else if(lead.length) L.push({type:'people', tag:ocPl(Lb.lead,lead.length), people:lead, acc:a});
+  else if(lead.length) L.push({type:'people', tag:ocPl(Lb.lead,lead.length), people:lead, acc:a, lead:true});
   /* An empty slot is an open post. A slot whose holder is hidden is not. */
-  else if(!slotPeople(s.lead).length && C.show.openPosts) L.push({type:'vacant', tag:Lb.lead, text:Lb.vacant, acc:a});
+  else if(!slotPeople(s.lead).length && C.show.openPosts) L.push({type:'vacant', tag:Lb.lead, text:Lb.vacant, acc:a, lead:true});
   const items=[], ref='site:'+s.id;
   const back=ocSlot(s.backup,Lb.backup);
   if(back.length && ocKey(s.backup.name)!==ocKey(s.lead&&s.lead.name))
@@ -5174,9 +5174,9 @@ function ocDeptLevels(d){
   mine.forEach(m=>have.add(ocKey(m.name)));
   const team=[...mine, ...ocMovedIn(ref, have)]
     .map(m=>({name:m.name, title:ocTitle(m.name, m.role||''), role:m.role||'', email:m.email||'', phone:m.phone||'', ref:'person:'+m.name}));
-  if(head.length) L.push({type:'people', tag:ocPl(Lb.dlead,head.length), people:head, acc:a});
+  if(head.length) L.push({type:'people', tag:ocPl(Lb.dlead,head.length), people:head, acc:a, lead:true});
   else if(!heads.size && C.show.openPosts && (team.length || (d.head && d.head.title)))
-    L.push({type:'vacant', tag:Lb.dlead, text:Lb.vacant, title:(d.head&&d.head.title)||'', acc:a});
+    L.push({type:'vacant', tag:Lb.dlead, text:Lb.vacant, title:(d.head&&d.head.title)||'', acc:a, lead:true});
   if(team.length) L.push({type:'stack', items:team, acc:a});
   L.slots=ocSlots(L);
   return ocTeamCount(L);
@@ -5193,8 +5193,8 @@ function ocLevels(ref){
 function ocNode(lv, focus){
   const f=ocKey(focus);
   if(lv.type==='team') return {k:'t', tag:lv.tag, name:lv.name, sub:lv.sub, areas:lv.areas||[], pis:lv.pis||[], acc:lv.acc, ref:lv.ref, below:lv.count, kids:[]};
-  if(lv.type==='vacant') return {k:'v', tag:lv.tag, text:lv.text, title:lv.title||'', acc:lv.acc, kids:[]};
-  return {k:'p', tag:lv.tag, acc:lv.acc, kids:[],
+  if(lv.type==='vacant') return {k:'v', tag:lv.tag, text:lv.text, title:lv.title||'', acc:lv.acc, lead:!!lv.lead, kids:[]};
+  return {k:'p', tag:lv.tag, acc:lv.acc, lead:!!lv.lead, kids:[],
     people:lv.people.map(p=>Object.assign({}, p, {focus:!!f && ocKey(p.name)===f}))};
 }
 function ocLeaf(it, acc, focus){
@@ -5501,6 +5501,7 @@ function ocCollapse(root, open){
       if(!open.has(n.id)){
         if(n.k==='t' && n.below==null) n.below=ocCountBelow(n);
         if(n.k==='p') n.moreText=n.totalText;
+        if(n.k==='t') ocFold([n]);   /* a closed team still names its lead */
         n.collapsed=true; n.kids=[];
         return;
       }
@@ -5685,7 +5686,7 @@ function ocWrapItems(M, prefix, items, size, bold, maxW, maxLines){
 
 /* ─── 3. Layout ──────────────────────────────────────────────── */
 
-const OCL={W:192, PAD:12, HG:20, VG:40, IND:24, LW:184, SG:7, R:9};
+const OCL={W:196, PAD:12, HG:22, VG:40, IND:24, LW:196, SG:10, R:9, SPG:34, SPN:12};
 const OCF={tag:7.6, tagLs:.75, name:12.5, title:10.5, tname:14, tsub:10, lname:12, ltitle:10, ltag:7.2};
 
 function ocMeasure(n, M){
@@ -5706,19 +5707,31 @@ function ocMeasure(n, M){
     n.ch=ocChipRows(M, n.areas, iw, 2);
     n.s2=(n.pis||[]).length ? ocWrapItems(M, (n.pis.length>1?'PIs: ':'PI: '), n.pis, OCF.tsub, false, iw, 3) : [];
     n.cl = n.below!=null && ocCfg().show.counts ? (n.below ? n.below+' '+(n.below===1?'person':'people') : 'Nobody listed yet') : '';
+    /* the lead, inside the team's own card */
+    n.lrows=[];
+    if(n.lead){
+      n.ltagL = n.lead.tag ? ocFit(M, n.lead.tag.toUpperCase(), OCF.tag, true, iw, OCF.tagLs) : '';
+      n.lrows = n.lead.vacant ? [{p:{name:n.lead.text}, vac:true, nl:[ocFit(M,n.lead.text,OCF.name,true,iw)], tl:n.lead.title?[ocFit(M,n.lead.title,OCF.title,false,iw)]:[]}]
+        : n.lead.people.map(p=>{ const nl=ocWrap(M,p.name,OCF.name,true,iw,2), tl=p.title?ocWrap(M,p.title,OCF.title,false,iw,2):[];
+            return {p, nl, tl}; });
+      n.lrows.forEach(r=>{ r.rh=r.nl.length*15.5+r.tl.length*13.5; });
+    }
+    const lh = n.lead ? 12 + (n.ltagL?14:0) + n.lrows.reduce((a,r)=>a+r.rh,0) + (n.lrows.length-1)*8 : 0;
     n.h = 12 + (n.tagL?14:0) + n.nl.length*17 + n.sl.length*13 + (n.ch.length ? 5+n.ch.length*(OCCH.h+OCCH.rg) : 0)
-        + (n.s2.length ? 3+n.s2.length*13 : 0) + (n.cl?16:0) + 11;
+        + (n.s2.length ? 3+n.s2.length*13 : 0) + (n.cl?16:0) + lh + 11;
   } else if(n.k==='v'){
     n.w=OCL.W;
     n.tl=n.title?[ocFit(M,n.title,OCF.title,false,iw)]:[];
     n.h = 12 + (n.tagL?14:0) + 15.5 + n.tl.length*13.5 + 10;
+  } else if(n.k==='g'){
+    n.w=0; n.h=0;
   } else {
     n.w=OCL.LW;
-    const lw=n.w-24;
+    const lw=n.w-2*OCL.PAD;
     n.tagL = n.tag ? ocFit(M, n.tag.toUpperCase(), OCF.ltag, true, lw, OCF.tagLs) : '';
     n.nl=ocWrap(M,n.name,OCF.lname,true,lw,2);
-    n.tl=n.title?[ocFit(M,n.title,OCF.ltitle,false,lw)]:[];
-    n.h = 8 + (n.tagL?11:0) + n.nl.length*15 + n.tl.length*13 + 8;
+    n.tl=n.title?ocWrap(M,n.title,OCF.ltitle,false,lw,2):[];
+    n.h = 11 + (n.tagL?11:0) + n.nl.length*15 + n.tl.length*13 + 9;
   }
 }
 
@@ -5732,66 +5745,89 @@ function ocCountBelow(n){
   return s.size;
 }
 
+/* A team card takes in its lead: "Southfield / Priya Raman, Site lead" in one
+   box, the way an org chart names a team by who runs it. Anyone hung directly
+   under the team (Manage → People on charts) then sits with the lead's people. */
+function ocFold(list){
+  list.forEach(n=>{
+    if(n.k==='t' && !n.lead){
+      const i=n.kids.findIndex(k=>k.lead && (k.k==='p'||k.k==='v'));
+      if(i>=0){
+        const L=n.kids[i];
+        n.lead = L.k==='v' ? {vacant:true, tag:L.tag, text:L.text, title:L.title} : {tag:L.tag, people:L.people};
+        n.kids=[...L.kids, ...n.kids.filter((_,j)=>j!==i)];
+        if(L.collapsed){ n.collapsed=true; n.id=L.id; }
+        if(L.openable){ n.openable=true; n.id=L.id; }
+      }
+    }
+    ocFold(n.kids);
+  });
+}
+
 /* Returns the drawing as a flat list of shapes, so the screen and the PDF
-   draw exactly the same chart from one description. */
+   draw exactly the same chart from one description.
+   Branches go side by side. People with nobody under them hang off a spine
+   instead: a line down the middle with cards either side, so a team of
+   twelve is six rows deep and two cards wide rather than one long strip. */
 function ocLayout(roots, M){
   const nodes=[];
   (function counts(list){ list.forEach(n=>{ counts(n.kids); if(n.k==='t' && n.below==null) n.below=ocCountBelow(n); }); })(roots);
-  const prep=(n,d,inStack)=>{
-    n.d=d; n.inStack=inStack; ocMeasure(n,M);
-    /* The bottom row goes in a column. Small rows of cards stay side by side. */
-    /* A card that can still open keeps its place in the row, so its + has room. */
-    n.stack = n.kids.length>0 && (n.kids.every(k=>k.k==='l') || (n.kids.every(k=>!k.kids.length && !k.collapsed) && n.kids.length>4));
+  ocFold(roots);
+  /* only people with nobody under them go on a spine; teams and closed cards stay in rows */
+  const leafy = k => !k.kids.length && !k.collapsed && !k.closed && (k.k==='l' || (k.k==='p' && k.people.length===1));
+  /* Three or more people with nobody under them become one or more spines
+     (up to twelve on each), placed in the row with any branches. */
+  const spines = n=>{
+    if(n.k==='g' || n.kids.some(k=>k.k==='g')) return;
+    const lv=n.kids.filter(leafy); if(lv.length<3) return;
+    const br=n.kids.filter(k=>!leafy(k));
+    const nb=Math.ceil(lv.length/OCL.SPN), per=Math.ceil(lv.length/nb), gs=[];
+    for(let i=0;i<lv.length;i+=per) gs.push({k:'g', kids:lv.slice(i,i+per)});
+    n.kids=[...br, ...gs];
+  };
+  const prep=(n,d,inSpine)=>{
+    spines(n);
+    n.d=d; n.inSpine=inSpine; ocMeasure(n,M);
     /* More than five closed cards in a row wrap into rows of up to five,
        so the row stays readable instead of running off the page. */
-    n.grid = !n.stack && n.kids.length>5 && n.kids.every(k=>!k.kids.length);
+    n.grid = n.k!=='g' && n.kids.length>5 && n.kids.every(k=>!k.kids.length);
     if(n.grid) n.cols=Math.ceil(n.kids.length/Math.ceil(n.kids.length/5));
     nodes.push(n);
-    n.kids.forEach(k=>prep(k,d+1,n.stack||n.grid));
+    n.kids.forEach(k=>prep(k,d+1,n.k==='g'||n.grid));
   };
   roots.forEach(r=>prep(r,0,false));
-  const rowH=[];
-  nodes.forEach(n=>{ if(!n.inStack) rowH[n.d]=Math.max(rowH[n.d]||0, n.h); });
   nodes.forEach(n=>{ if(n.grid) n.kids.forEach(k=>{ k._g=true; }); });
-  rowH.length=0;
-  nodes.forEach(n=>{ if(!n.inStack && !n._g) rowH[n.d]=Math.max(rowH[n.d]||0, n.h); });
+  const rowH=[];
+  nodes.forEach(n=>{ if(!n.inSpine && !n._g) rowH[n.d]=Math.max(rowH[n.d]||0, n.h); });
   const rowY=[0];
   for(let d=1; d<rowH.length; d++) rowY[d]=rowY[d-1]+(rowH[d-1]||0)+OCL.VG;
+  const W=OCL.LW, G=OCL.SPG;
+  /* a spine: cards alternate left and right of the line */
+  const spineW = g => g.kids.length>1 ? 2*W+G : W;
   const sw=n=>{
     if(n._sw!=null) return n._sw;
     let v;
-    if(!n.kids.length) v=n.w;
-    else if(n.stack){ const c=ncols(n); v=Math.max(n.w, c>1 ? c*(OCL.IND+OCL.LW)+(c-1)*COLGAP : OCL.IND+Math.max(...n.kids.map(sw))); }
+    if(n.k==='g') v=spineW(n);
+    else if(!n.kids.length) v=n.w;
     else if(n.grid){ v=n.w; for(let i=0;i<n.kids.length;i+=n.cols){ const r=n.kids.slice(i,i+n.cols); v=Math.max(v, r.reduce((a,k)=>a+k.w,0)+OCL.HG*(r.length-1)); } }
     else v=Math.max(n.w, n.kids.reduce((a,k)=>a+sw(k),0)+OCL.HG*(n.kids.length-1));
     return (n._sw=v);
   };
-  /* A column, and anyone in it with people of their own gets a column
-     indented beneath them. Returns where the next card can start. */
-  /* A long list (more than seven people, none with people of their own) is
-     split into columns of six, so a big site doesn't print as one tall strip. */
-  const ncols=n=>(n.kids.length>7 && n.kids.every(k=>!k.kids.length)) ? Math.min(3, Math.ceil(n.kids.length/6)) : 1;
-  const COLGAP=16;
-  const col=n=>{
-    const c=ncols(n);
-    if(c>1){
-      const per=Math.ceil(n.kids.length/c); let bottom=0;
-      n.cols=c; n.colTop=n.y+n.h+30;
-      for(let i=0;i<c;i++){
-        let yy=n.colTop;
-        n.kids.slice(i*per,(i+1)*per).forEach(k=>{ k.x=n.x+OCL.IND+i*(OCL.LW+OCL.IND+COLGAP); k.y=yy; k.colI=i; yy+=k.h+OCL.SG; });
-        bottom=Math.max(bottom,yy);
-      }
-      return bottom;
-    }
-    let yy=n.y+n.h+(n.k==='l'?OCL.SG+2:16);
-    n.kids.forEach(k=>{ k.x=n.x+OCL.IND; k.y=yy; yy+=k.h+OCL.SG; if(k.kids.length) yy=col(k); });
-    return yy;
-  };
   const place=(n,left)=>{
     n.y=rowY[n.d];
+    if(n.k==='g'){
+      const lx=left+(sw(n)-spineW(n))/2;
+      n.sx = n.kids.length>1 ? lx+W+G/2 : lx+W/2;
+      n.x=n.sx; n.top=n.y;
+      let yy=n.y; n.rows=[];   /* first row level with the other cards in this row */
+      for(let i=0;i<n.kids.length;i+=2){
+        const pair=n.kids.slice(i,i+2), h=Math.max(...pair.map(k=>k.h));
+        pair.forEach((k,j)=>{ k.x = n.kids.length>1 ? (j? lx+W+G : lx) : lx; k.y=yy; k.side=j; });
+        n.rows.push(yy+Math.min(h/2,24)); yy+=h+OCL.SG;
+      }
+      return;
+    }
     if(!n.kids.length){ n.x=left+(sw(n)-n.w)/2; return; }
-    if(n.stack){ n.x=left; col(n); return; }
     if(n.grid){
       n.x=left+(sw(n)-n.w)/2;
       const cellH=Math.max(...n.kids.map(k=>k.h)), y0=n.y+rowH[n.d]+OCL.VG;
@@ -5807,59 +5843,47 @@ function ocLayout(roots, M){
     const span=n.kids.reduce((a,k)=>a+sw(k),0)+OCL.HG*(n.kids.length-1);
     let l=left+(sw(n)-span)/2;
     n.kids.forEach(k=>{ place(k,l); l+=sw(k)+OCL.HG; });
+    const mid=k=>k.k==='g' ? k.sx : k.x+k.w/2;
     const a=n.kids[0], b=n.kids[n.kids.length-1];
-    const mid=((a.x+a.w/2)+(b.x+b.w/2))/2;
-    n.x=Math.min(Math.max(mid-n.w/2, left), left+sw(n)-n.w);
+    const m=(mid(a)+mid(b))/2;
+    n.x=Math.min(Math.max(m-n.w/2, left), left+sw(n)-n.w);
   };
   let left=0;
   roots.forEach(r=>{ place(r,left); left+=sw(r)+OCL.HG*2; });
 
-  const P=[];
+  const P=[], line=(pts)=>P.push({t:'path', pts, c:OC_WIRE, w:1.2});
   /* connectors first, so the cards sit on top of them */
   nodes.forEach(n=>{
     if(!n.kids.length) return;
+    if(n.k==='g'){
+      const last=n.rows[n.rows.length-1];
+      line([[n.sx,n.top],[n.sx,last]]);
+      n.kids.forEach(k=>{ const ky=k.y+Math.min(k.h/2,24);
+        if(n.kids.length>1) line([[n.sx,ky],[k.side ? k.x : k.x+k.w, ky]]); });
+      return;
+    }
     const px=n.x+n.w/2, py=n.y+n.h;
-    if(n.stack && n.cols>1){
-      /* a bar under the card, then one rail per column */
-      const by=n.colTop-14, rails=[];
-      for(let i=0;i<n.cols;i++) rails.push(n.x+12+i*(OCL.LW+OCL.IND+COLGAP));
-      P.push({t:'path', pts:[[rails[0],py],[rails[0],by]], c:OC_WIRE, w:1.2});
-      P.push({t:'path', pts:[[rails[0],by],[rails[rails.length-1],by]], c:OC_WIRE, w:1.2});
-      rails.forEach((rx,i)=>{
-        const ks=n.kids.filter(k=>k.colI===i); if(!ks.length) return;
-        const last=ks[ks.length-1];
-        P.push({t:'path', pts:[[rx,by],[rx,last.y+Math.min(last.h/2,20)]], c:OC_WIRE, w:1.2});
-        ks.forEach(k=>{ const ky=k.y+Math.min(k.h/2,20); P.push({t:'path', pts:[[rx,ky],[k.x,ky]], c:OC_WIRE, w:1.2}); });
-      });
-      return;
-    }
-    if(n.stack){
-      const rx=n.x+12, last=n.kids[n.kids.length-1];
-      P.push({t:'path', pts:[[rx,py],[rx,last.y+Math.min(last.h/2,20)]], c:OC_WIRE, w:1.2});
-      n.kids.forEach(k=>{ const ky=k.y+Math.min(k.h/2,20); P.push({t:'path', pts:[[rx,ky],[k.x,ky]], c:OC_WIRE, w:1.2}); });
-      return;
-    }
     if(n.grid){
       const bars=n.gridRows.map((r,i)=>r.y-(i?OCL.VG*.4:OCL.VG/2));
-      P.push({t:'path', pts:[[px,py],[px,bars[bars.length-1]]], c:OC_WIRE, w:1.2});
+      line([[px,py],[px,bars[bars.length-1]]]);
       n.gridRows.forEach((r,i)=>{
         const cx=r.kids.map(k=>k.x+k.w/2);
-        P.push({t:'path', pts:[[Math.min(px,...cx),bars[i]],[Math.max(px,...cx),bars[i]]], c:OC_WIRE, w:1.2});
-        r.kids.forEach((k,j)=>P.push({t:'path', pts:[[cx[j],bars[i]],[cx[j],k.y]], c:OC_WIRE, w:1.2}));
+        line([[Math.min(px,...cx),bars[i]],[Math.max(px,...cx),bars[i]]]);
+        r.kids.forEach((k,j)=>line([[cx[j],bars[i]],[cx[j],k.y]]));
       });
       return;
     }
     const my=rowY[n.d+1]-OCL.VG/2;
-    const cxs=n.kids.map(k=>k.x+k.w/2);
-    P.push({t:'path', pts:[[px,py],[px,my]], c:OC_WIRE, w:1.2});
+    const cxs=n.kids.map(k=>k.k==='g' ? k.sx : k.x+k.w/2);
+    line([[px,py],[px,my]]);
     if(n.kids.length>1 || Math.abs(cxs[0]-px)>.5)
-      P.push({t:'path', pts:[[Math.min(px,...cxs),my],[Math.max(px,...cxs),my]], c:OC_WIRE, w:1.2});
-    n.kids.forEach((k,i)=>P.push({t:'path', pts:[[cxs[i],my],[cxs[i],k.y]], c:OC_WIRE, w:1.2}));
+      line([[Math.min(px,...cxs),my],[Math.max(px,...cxs),my]]);
+    n.kids.forEach((k,i)=>line([[cxs[i],my],[cxs[i],k.y]]));
   });
-  nodes.forEach(n=>ocDraw(n,P));
+  nodes.forEach(n=>{ if(n.k!=='g') ocDraw(n,P); });
   let w=0,h=0;
-  nodes.forEach(n=>{ w=Math.max(w,n.x+n.w); h=Math.max(h,n.y+n.h); });
-  return {prims:P, w, h, nodes};
+  nodes.forEach(n=>{ if(n.k==='g') return; w=Math.max(w,n.x+n.w); h=Math.max(h,n.y+n.h); });
+  return {prims:P, w, h, nodes:nodes.filter(n=>n.k!=='g')};
 }
 
 function ocDraw(n, P){
@@ -5893,8 +5917,22 @@ function ocDraw(n, P){
     n.sl.forEach(l=>{ P.push({t:'text', x:cx, y:yy+10, s:l, size:OCF.tsub, c:OC_MUTED, a:'middle'}); yy+=13; });
     if(n.ch.length){ yy+=5; yy+=ocChipPrims(P, n.ch, cx, yy, n.acc, 'middle'); }
     if(n.s2.length){ yy+=3; n.s2.forEach(l=>{ P.push({t:'text', x:cx, y:yy+10, s:l, size:OCF.tsub, c:OC_MUTED, a:'middle'}); yy+=13; }); }
-    if(n.cl) P.push({t:'text', x:cx, y:yy+13, s:n.cl, size:9.5, bold:true, c:n.acc, a:'middle'});
+    if(n.cl){ P.push({t:'text', x:cx, y:yy+13, s:n.cl, size:9.5, bold:true, c:n.acc, a:'middle'}); yy+=16; }
     if(n.ref) P.push({t:'hit', x, y, w:W, h:n.h, r:OCL.R, ref:n.ref, label:n.name});
+    if(n.lead){
+      yy+=6;
+      P.push({t:'path', pts:[[x+PAD+4,yy],[x+W-PAD-4,yy]], c:ocMix(n.acc,.34), w:.8}); yy+=6;
+      const lc = n.lead.vacant ? OC_WARN : n.acc;
+      if(n.ltagL){ P.push({t:'text', x:cx, y:yy+8, s:n.ltagL, size:OCF.tag, bold:true, c:lc, a:'middle', ls:OCF.tagLs}); yy+=14; }
+      n.lrows.forEach((r,i)=>{
+        if(i) yy+=8;
+        const top=yy;
+        if(r.p.focus) P.push({t:'card', x:x+7, y:yy-4, w:W-12, h:r.rh+7, r:6, fill:ocMix(OC_HALO,.45), stroke:null});
+        r.nl.forEach(l=>{ P.push({t:'text', x:cx, y:yy+11.5, s:l, size:OCF.name, bold:true, c:r.vac?OC_WARN:OC_INK, a:'middle'}); yy+=15.5; });
+        r.tl.forEach(l=>{ P.push({t:'text', x:cx, y:yy+10, s:l, size:OCF.title, c:OC_MUTED, a:'middle'}); yy+=13.5; });
+        if(!r.vac && r.p.ref && !r.p.focus) P.push({t:'hit', x:x+5, y:top-5, w:W-10, h:r.rh+9, r:6, ref:r.p.ref, label:r.p.name});
+      });
+    }
     if(n.collapsed||n.openable) P.push({t:'toggle', x:cx, y:n.y+n.h, open:!n.collapsed, id:n.id, c:n.acc, label:n.name});
     return;
   }
@@ -5906,15 +5944,16 @@ function ocDraw(n, P){
     n.tl.forEach(l=>P.push({t:'text', x:cx, y:yy+10, s:l, size:OCF.title, c:OC_MUTED, a:'middle'}));
     return;
   }
-  /* l: one person in a column */
-  const foc=n.focus, tx=x+14;
-  P.push({t:'card', x, y, w:W, h:n.h, r:7, fill:foc?OC_NAVY:'#FFFFFF', stroke:foc?OC_NAVY:OC_LINE,
-    band:{side:'left', s:3, c:foc?OC_HALO:n.acc}, shadow:true});
-  let yy=y+8;
-  if(n.tagL){ P.push({t:'text', x:tx, y:yy+7.5, s:n.tagL, size:OCF.ltag, bold:true, c:foc?OC_HALO:OC_MUTED2, a:'start', ls:OCF.tagLs}); yy+=11; }
-  n.nl.forEach(l=>{ P.push({t:'text', x:tx, y:yy+11, s:l, size:OCF.lname, bold:true, c:foc?'#FFFFFF':OC_INK, a:'start'}); yy+=15; });
-  n.tl.forEach(l=>{ P.push({t:'text', x:tx, y:yy+9.5, s:l, size:OCF.ltitle, c:foc?'#C9D6E8':OC_MUTED, a:'start'}); yy+=13; });
-  if(n.ref && !foc) P.push({t:'hit', x, y, w:W, h:n.h, r:7, ref:n.ref, label:n.name});
+  /* l: one person in a team */
+  const foc=n.focus;
+  P.push({t:'card', x, y, w:W, h:n.h, r:8, fill:foc?OC_NAVY:'#FFFFFF', stroke:foc?OC_NAVY:OC_LINE,
+    band:{side:'top', s:3, c:foc?OC_HALO:n.acc}, shadow:true});
+  let yy=y+11;
+  if(n.tagL){ P.push({t:'text', x:cx, y:yy+7.5, s:n.tagL, size:OCF.ltag, bold:true, c:foc?OC_HALO:OC_MUTED2, a:'middle', ls:OCF.tagLs}); yy+=11; }
+  n.nl.forEach(l=>{ P.push({t:'text', x:cx, y:yy+11, s:l, size:OCF.lname, bold:true, c:foc?'#FFFFFF':OC_INK, a:'middle'}); yy+=15; });
+  n.tl.forEach(l=>{ P.push({t:'text', x:cx, y:yy+9.5, s:l, size:OCF.ltitle, c:foc?'#C9D6E8':OC_MUTED, a:'middle'}); yy+=13; });
+  if(n.ref && !foc) P.push({t:'hit', x, y, w:W, h:n.h, r:8, ref:n.ref, label:n.name});
+  if(n.collapsed||n.openable) P.push({t:'toggle', x:cx, y:n.y+n.h, open:!n.collapsed, id:n.id, c:n.acc, label:n.name});
 }
 
 /* ─── 4. On screen: SVG ──────────────────────────────────────── */
@@ -6130,16 +6169,30 @@ function ocPlan(ref){
        where it sits, so the page isn't spent repeating the people above. */
     const v=view(path), pg=fit(path.length ? [v.end] : v.rs, path.length ? crumbs.join(' \u203a ') : '');
     if(pg.s>=MIN || depth>3) return [pg];
-    let n=v.end, steps=[];
-    while(!n.stack && !n.grid && n.kids.length===1){ n=n.kids[0]; steps.push(0); }
+    /* a fresh copy: laying a tree out folds and regroups its cards */
+    let n=view(path).end, steps=[];
+    const leafy=m=>m.kids.every(k=>!k.kids.length);
+    while(!leafy(n) && n.kids.length===1){ n=n.kids[0]; steps.push(0); }
     const open=n.kids.map((k,i)=>k.kids.length?i:-1).filter(i=>i>=0);
-    if(n.stack || n.kids.length<2 || !open.length) return [pg];
+    if(leafy(n) || n.kids.length<2 || !open.length) return [pg];
     const here=path.concat(steps), out=[];
     { const w=view(here), at=path.length ? (()=>{ let m=w.rs[0]; path.forEach(()=>{ m=m.kids[0]; }); return m; })() : null;
-      w.end.kids.forEach(k=>{ if(k.k==='p'){ if(k.totalText) k.moreText=k.totalText; else if(!k.moreText) k.more=ocCountBelow(k); } k.kids=[]; });
+      w.end.kids.forEach(k=>{ if(k.k==='p'){ if(k.totalText) k.moreText=k.totalText; else if(!k.moreText) k.more=ocCountBelow(k); } if(k.k==='t') ocFold([k]); if(k.kids.length) k.closed=true; k.kids=[]; });
       out.push(fit(at ? [at] : w.rs, (crumbs.length?crumbs.join(' \u203a ')+' \u00b7 ':'')+'Overview'+(open.length?' \u00b7 '+open.length+' open '+(open.length>1?'branches follow':'branch follows'):''))); }
     const chain=view(here).end;
-    open.forEach(i=>out.push(...pagesFor(here.concat(i), crumbs.concat(name(chain.kids[i])), depth+1)));
+    /* Small branches share a page, side by side, as long as they still read
+       at a decent size; a branch too big for a page of its own is split further. */
+    let group=[];
+    const lab=g=>crumbs.concat(g.length>3 ? g.slice(0,2).map(x=>x.n).join(', ')+' and '+(g.length-2)+' more' : g.map(x=>x.n).join(', ')).join(' \u203a ');
+    const pageOf=g=>fit(g.map(x=>view(here.concat(x.i)).end), lab(g));
+    const flush=()=>{ if(group.length) out.push(pageOf(group)); group=[]; };
+    open.forEach(i=>{
+      const it={i, n:name(chain.kids[i])};
+      if(pageOf([it]).s<MIN){ flush(); out.push(...pagesFor(here.concat(i), crumbs.concat(it.n), depth+1)); return; }
+      if(group.length && pageOf([...group, it]).s<MIN) flush();
+      group.push(it);
+    });
+    flush();
     return out;
   };
   return {spec, pages:pagesFor([], [name(rs0[0])], 0)};
