@@ -5454,6 +5454,7 @@ function ocOrgPlaces(name){
 }
 function ocOrgTree(){
   const C=ocCfg(), top=ocOrgTop(); if(!top) return null;
+  OC_ORG_NAMES=new Set();
   const tk=ocKey(top);
   const admins=(DATA.admins||[]).filter(a=>a && a.name && !C.hide.has(ocKey(a.name)) && ocKey(a.name)!==tk);
   const ak=new Map(admins.map(a=>[ocKey(a.name),a]));
@@ -5466,24 +5467,54 @@ function ocOrgTree(){
     const subs=admins.filter(a=>parent(a)===ocKey(name) && !placed.has(ocKey(a.name)));
     subs.forEach(a=>placed.add(ocKey(a.name)));
     const people=subs.map(a=>build(a.name));
-    const teams=ocKidsOf(name, ocOrgPlaces(name), true).kids;
+    const teams=ocOrgTidy(ocKidsOf(name, ocOrgPlaces(name), true).kids);
     const have=ocNamesIn([...people, ...teams]);
     const reps=ocReports(name).filter(r=>!have.has(ocKey(r.name)) && !ak.has(ocKey(r.name)) && ocKey(r.name)!==tk);
     const e=ocEntry(name);
-    return {k:'p', tag:'', people:[{name:e.name, title:e.title, ref:e.ref}], acc:OC_ADMIN,
+    return {k:'p', tag:'', people:[{name:e.name, title:e.title, ref:e.ref}], acc:OC_ADMIN, col:true,
       kids:[...people, ...teams, ...(reps.length?[{k:'t', tag:'', name:'Direct reports', sub:'', acc:OC_ADMIN, kids:reps}]:[])]};
   };
-  const root=build(top);
+  const root=build(top); root.col=false; root.noGrid=true;
   admins.filter(a=>!placed.has(ocKey(a.name))).forEach(a=>{ placed.add(ocKey(a.name)); root.kids.push(build(a.name)); });
   const onChart=new Set([tk, ...ak.keys()]);
   const ledByAdmin=ref=>{ const d=String(ref).startsWith('dept:') && dept(String(ref).slice(5));
     return !!d && slotPeople(d.head).some(p=>onChart.has(ocKey(p.name))); };
   const loose=[...(DATA.depts||[]).map(d=>'dept:'+d.id), ...(DATA.sites||[]).map(x=>'site:'+x.id)]
     .filter(ref=>!ocOwners(ref) && !ledByAdmin(ref));
-  if(loose.length) root.kids.push({k:'t', tag:'', name:'Nobody responsible yet', sub:'Set in Manage \u2192 Org charts', acc:OC_MUTED2,
-    kids:ocMerge(loose.flatMap(ref=>ocBuild(ocLevels(ref),0,null)))});
+  /* Teams nobody owns sit apart, to the right, with no line to the top:
+     they are a to-do list, not someone's reports. */
+  if(loose.length) root.kids.push({k:'t', tag:'', name:'Needs an owner', sub:'Set in Manage \u2192 Admin team', acc:OC_WARN,
+    apart:true, col:true, kids:ocOrgTidy(ocMerge(loose.flatMap(ref=>ocBuild(ocLevels(ref),0,null))))});
+  if(loose.length){ const nb=root.kids[root.kids.length-1]; nb.below=nb.kids.reduce((a,k)=>a+(k.below||0),0); }
   return root;
 }
+/* The whole-organisation chart is about who runs what, not every name:
+   each site or department is one box naming its lead, with its head count.
+   CRMs stay as cards with their sites under them; a site with no CRM sits
+   straight under whoever owns it and says so. */
+let OC_ORG_NAMES=new Set();
+function ocOrgTidy(list){
+  const out=[];
+  list.forEach(n=>{
+    if(n.k==='t' && n.ref){
+      n.below=ocCountBelow(n); ocNamesBelow(n).forEach(k=>OC_ORG_NAMES.add(k));
+      ocFold([n]); n.kids=[]; n.areas=[]; n.pis=[];
+      if(String(n.ref).startsWith('site:')){
+        const L=ocLevels(n.ref);
+        if(L && (L.slots||{}).crm==null) n.flag='No CRM for this site';
+      }
+      out.push(n);
+    } else if(n.k==='p' || n.k==='t'){
+      /* CRMs first, then the sites that have none */
+      n.kids=ocOrgTidy(n.kids).sort((a,b)=>(a.k==='p'?0:1)-(b.k==='p'?0:1));
+      if(n.k==='p') n.col=true;
+      out.push(n);
+    } else out.push(n);
+  });
+  return out;
+}
+/* What opens by default: the admin team, each showing the teams they own. */
+function ocOrgDefault(){ return ocOrgIds().filter(id=>id.split('>').length===2); }
 /* Opens one level at a time. Inside a site or department everything shows,
    because that is the team itself. Returns every id that can open. */
 function ocCollapse(root, open){
@@ -5547,7 +5578,8 @@ function ocSpec(ref){
     let t; OC_FORCE_OWN=true;
     try{ t=ocOrgTree(); } finally{ OC_FORCE_OWN=false; }
     if(!t) return null;
-    const n=ocCountBelow(t)+1;
+    const all=ocNamesBelow(t); OC_ORG_NAMES.forEach(k=>all.add(k));
+    const n=all.size+1;
     let teams=0; (function c(m){ m.kids.forEach(k=>{ if(k.k==='t' && k.ref) teams++; c(k); }); })(t);
     ocCollapse(t, OCV.open || new Set());
     return {kind:'org', lead:true, title:C.org.title, eyebrow:'Whole organisation',
@@ -5718,7 +5750,7 @@ function ocMeasure(n, M){
     }
     const lh = n.lead ? 12 + (n.ltagL?14:0) + n.lrows.reduce((a,r)=>a+r.rh,0) + (n.lrows.length-1)*8 : 0;
     n.h = 12 + (n.tagL?14:0) + n.nl.length*17 + n.sl.length*13 + (n.ch.length ? 5+n.ch.length*(OCCH.h+OCCH.rg) : 0)
-        + (n.s2.length ? 3+n.s2.length*13 : 0) + (n.cl?16:0) + lh + 11;
+        + (n.s2.length ? 3+n.s2.length*13 : 0) + (n.cl?16:0) + (n.flag?15:0) + lh + 11;
   } else if(n.k==='v'){
     n.w=OCL.W;
     n.tl=n.title?[ocFit(M,n.title,OCF.title,false,iw)]:[];
@@ -5735,14 +5767,15 @@ function ocMeasure(n, M){
   }
 }
 
-function ocCountBelow(n){
+function ocCountBelow(n){ return ocNamesBelow(n).size; }
+function ocNamesBelow(n){
   const s=new Set();
   (function walk(m){ m.kids.forEach(k=>{
     if(k.k==='p') k.people.forEach(p=>s.add(ocKey(p.name)));
     else if(k.k==='l') s.add(ocKey(k.name));
     walk(k);
   }); })(n);
-  return s.size;
+  return s;
 }
 
 /* A team card takes in its lead: "Southfield / Priya Raman, Site lead" in one
@@ -5779,6 +5812,17 @@ function ocLayout(roots, M){
      (up to twelve on each), placed in the row with any branches. */
   const spines = n=>{
     if(n.k==='g' || n.kids.some(k=>k.k==='g')) return;
+    /* A column: closed cards and team boxes straight down under their owner,
+       so a row of owners never spreads sideways. Anything opened branches out
+       beside the column. */
+    if(n.col){
+      const cl=n.kids.filter(k=>!k.kids.length && !k.apart), br=n.kids.filter(k=>k.kids.length || k.apart);
+      /* a long column wraps into columns of up to five, read top to bottom */
+      const per=5, nc=Math.ceil(cl.length/per), gs=[];
+      for(let i=0;i<nc;i++) gs.push({k:'g', col:true, kids:cl.slice(Math.round(i*cl.length/nc), Math.round((i+1)*cl.length/nc))});
+      if(cl.length) n.kids=[...br, ...gs];
+      return;
+    }
     const lv=n.kids.filter(leafy); if(lv.length<3) return;
     const br=n.kids.filter(k=>!leafy(k));
     const nb=Math.ceil(lv.length/OCL.SPN), per=Math.ceil(lv.length/nb), gs=[];
@@ -5790,7 +5834,7 @@ function ocLayout(roots, M){
     n.d=d; n.inSpine=inSpine; ocMeasure(n,M);
     /* More than five closed cards in a row wrap into rows of up to five,
        so the row stays readable instead of running off the page. */
-    n.grid = n.k!=='g' && n.kids.length>5 && n.kids.every(k=>!k.kids.length);
+    n.grid = n.k!=='g' && !n.noGrid && n.kids.length>5 && n.kids.every(k=>!k.kids.length);
     if(n.grid) n.cols=Math.ceil(n.kids.length/Math.ceil(n.kids.length/5));
     nodes.push(n);
     n.kids.forEach(k=>prep(k,d+1,n.k==='g'||n.grid));
@@ -5803,18 +5847,25 @@ function ocLayout(roots, M){
   for(let d=1; d<rowH.length; d++) rowY[d]=rowY[d-1]+(rowH[d-1]||0)+OCL.VG;
   const W=OCL.LW, G=OCL.SPG;
   /* a spine: cards alternate left and right of the line */
-  const spineW = g => g.kids.length>1 ? 2*W+G : W;
+  const spineW = g => g.col ? Math.max(...g.kids.map(k=>k.w)) : g.kids.length>1 ? 2*W+G : W;
+  const colGap = k => (k.collapsed||k.openable) ? 28 : 16;
   const sw=n=>{
     if(n._sw!=null) return n._sw;
     let v;
     if(n.k==='g') v=spineW(n);
     else if(!n.kids.length) v=n.w;
     else if(n.grid){ v=n.w; for(let i=0;i<n.kids.length;i+=n.cols){ const r=n.kids.slice(i,i+n.cols); v=Math.max(v, r.reduce((a,k)=>a+k.w,0)+OCL.HG*(r.length-1)); } }
-    else v=Math.max(n.w, n.kids.reduce((a,k)=>a+sw(k),0)+OCL.HG*(n.kids.length-1));
+    else v=Math.max(n.w, n.kids.reduce((a,k,i)=>a+sw(k)+(i?OCL.HG+(k.apart?OCL.HG*3:0):0),0));
     return (n._sw=v);
   };
   const place=(n,left)=>{
     n.y=rowY[n.d];
+    if(n.k==='g' && n.col){
+      n.sx=left+sw(n)/2; n.x=n.sx; n.top=n.y;
+      let yy=n.y; n.rows=[];
+      n.kids.forEach(k=>{ k.x=n.sx-k.w/2; k.y=yy; n.rows.push(yy); yy+=k.h+colGap(k); });
+      return;
+    }
     if(n.k==='g'){
       const lx=left+(sw(n)-spineW(n))/2;
       n.sx = n.kids.length>1 ? lx+W+G/2 : lx+W/2;
@@ -5840,11 +5891,13 @@ function ocLayout(roots, M){
       }
       return;
     }
-    const span=n.kids.reduce((a,k)=>a+sw(k),0)+OCL.HG*(n.kids.length-1);
+    const gap=k=>OCL.HG+(k.apart?OCL.HG*3:0);
+    const span=n.kids.reduce((a,k,i)=>a+sw(k)+(i?gap(k):0),0);
     let l=left+(sw(n)-span)/2;
-    n.kids.forEach(k=>{ place(k,l); l+=sw(k)+OCL.HG; });
+    n.kids.forEach((k,i)=>{ if(i) l+=gap(k); place(k,l); l+=sw(k); });
     const mid=k=>k.k==='g' ? k.sx : k.x+k.w/2;
-    const a=n.kids[0], b=n.kids[n.kids.length-1];
+    const linked=n.kids.filter(k=>!k.apart).length ? n.kids.filter(k=>!k.apart) : n.kids;
+    const a=linked[0], b=linked[linked.length-1];
     const m=(mid(a)+mid(b))/2;
     n.x=Math.min(Math.max(m-n.w/2, left), left+sw(n)-n.w);
   };
@@ -5855,6 +5908,10 @@ function ocLayout(roots, M){
   /* connectors first, so the cards sit on top of them */
   nodes.forEach(n=>{
     if(!n.kids.length) return;
+    if(n.k==='g' && n.col){
+      line([[n.sx,n.top],[n.sx,n.rows[n.rows.length-1]]]);
+      return;
+    }
     if(n.k==='g'){
       const last=n.rows[n.rows.length-1];
       line([[n.sx,n.top],[n.sx,last]]);
@@ -5874,11 +5931,13 @@ function ocLayout(roots, M){
       return;
     }
     const my=rowY[n.d+1]-OCL.VG/2;
-    const cxs=n.kids.map(k=>k.k==='g' ? k.sx : k.x+k.w/2);
+    const ks=n.kids.filter(k=>!k.apart);
+    if(!ks.length) return;
+    const cxs=ks.map(k=>k.k==='g' ? k.sx : k.x+k.w/2);
     line([[px,py],[px,my]]);
-    if(n.kids.length>1 || Math.abs(cxs[0]-px)>.5)
+    if(ks.length>1 || Math.abs(cxs[0]-px)>.5)
       line([[Math.min(px,...cxs),my],[Math.max(px,...cxs),my]]);
-    n.kids.forEach((k,i)=>line([[cxs[i],my],[cxs[i],k.y]]));
+    ks.forEach((k,i)=>line([[cxs[i],my],[cxs[i],k.y]]));
   });
   nodes.forEach(n=>{ if(n.k!=='g') ocDraw(n,P); });
   let w=0,h=0;
@@ -5918,6 +5977,7 @@ function ocDraw(n, P){
     if(n.ch.length){ yy+=5; yy+=ocChipPrims(P, n.ch, cx, yy, n.acc, 'middle'); }
     if(n.s2.length){ yy+=3; n.s2.forEach(l=>{ P.push({t:'text', x:cx, y:yy+10, s:l, size:OCF.tsub, c:OC_MUTED, a:'middle'}); yy+=13; }); }
     if(n.cl){ P.push({t:'text', x:cx, y:yy+13, s:n.cl, size:9.5, bold:true, c:n.acc, a:'middle'}); yy+=16; }
+    if(n.flag){ P.push({t:'text', x:cx, y:yy+12, s:n.flag, size:9.5, bold:true, c:OC_WARN, a:'middle'}); yy+=15; }
     if(n.ref) P.push({t:'hit', x, y, w:W, h:n.h, r:OCL.R, ref:n.ref, label:n.name});
     if(n.lead){
       yy+=6;
@@ -6308,7 +6368,7 @@ function ocActions(ref, name){
          'back' = pressed Back, anything else = a fresh start from a drawer */
 async function ocOpen(ref, mode){
   /* a fresh start opens the whole-organisation chart closed, before it is drawn */
-  if(mode!==true && mode!=='back') OCV.open=new Set();
+  if(mode!==true && mode!=='back') OCV.open=new Set(ref==='org' ? ocOrgDefault() : []);
   const spec=ocSpec(ref);
   if(!spec){ toast('That chart could not be found.'); return; }
   if(!ocIsOpen()) OCV.from=document.activeElement;
